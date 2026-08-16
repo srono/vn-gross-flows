@@ -1,0 +1,3 @@
+manager_id,fund_key,fund_code,url,published,title,label,filename_date,path,error
+vcbf,vcbaif,VCBF-AIF,https://www.vcbf.com/images/2025/vcbaif_bc_tuan_20251126.xlsx,2025-11-28,Báo cáo thay đổi giá trị tài sản ròng Quỹ AIF - Tuần 48/2025,Tuần 48/2025,2025-11-26,data/raw/vcbf/vcbaif_bc_tuan_20251126-1826c17b2194a296.xlsx,BadZipFile: File is not a zip file
+vcbf,vcbbcf,VCBF-BCF,https://www.vcbf.com/images/2025/vcbbcf_bc_tuan_20251126.xlsx,2025-11-28,Báo cáo thay đổi giá trị tài sản ròng Quỹ BCF - Tuần 48/2025,Tuần 48/2025,2025-11-26,data/raw/vcbf/vcbbcf_bc_tuan_20251126-4f150fe83c3f4d4e.xlsx,BadZipFile: File is not a zip file

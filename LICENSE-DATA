@@ -1,0 +1,35 @@
+# Licence for the data in this repository
+
+The code in this repository is under the MIT Licence; see LICENSE.
+
+The derived data files under `data/` are released under the Creative Commons
+Attribution 4.0 International licence (CC BY 4.0):
+https://creativecommons.org/licenses/by/4.0/
+
+## What is and is not covered
+
+Covered: the derived numeric panel and its companion files, the curated deposit
+rate series, and the enumerated filing reference lists. These are figures
+extracted from mandatory public regulatory disclosures, together with the
+provenance needed to trace each one.
+
+Not covered, and not distributed here: the source filings themselves. The
+managers' own PDF and XLSX documents are not redistributed from this repository.
+`data/raw` is excluded from version control. Anyone who wants the primary
+documents should fetch them from the managers, which `python -m vnflows.run
+fetch` does at one request per second with an identifying user agent.
+
+## Attribution and upstream terms
+
+The underlying disclosures are filed under Appendix XXIV of Circular
+98/2020/TT-BTC and published by Vietcombank Fund Management, VinaCapital Fund
+Management, SSI Asset Management and Dragon Capital Vietfund Management. Cite
+this dataset for the compilation; cite the managers for the underlying filings.
+
+Machine-readable source terms were checked on 2026-08-16 and are summarised in
+METHOD.md section 9. One source, www.vcbf.com, publishes a content signal of
+`ai-train=no, use=reference`. Users of this dataset should read that section
+before redistributing or ingesting it for purposes beyond reference.
+
+No warranty is given as to accuracy or fitness for any purpose. Every excluded
+row is documented; see the exclusion files listed in DATA_DICTIONARY.md.

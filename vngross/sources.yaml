@@ -1,0 +1,370 @@
+# Manager and fund registry.
+#
+# An entry is promoted from `unverified` to `verified` only once a filing has
+# been fetched and parsed and its text layer added as a fixture.
+#
+# `fund_key` is the filename prefix on the manager's own archive. It is the
+# identity key for the panel because it is stable across renames: VCBF's Blue
+# Chip Fund files as `vcbbcf_*` throughout, while the code printed inside the
+# document changed from VCBBCF (2022) to VCBF-BCF (2024 onward). Keying on the
+# in-document code would split one fund into two and fabricate a continuity
+# break at the rename.
+
+managers:
+  vcbf:
+    name: Vietcombank Fund Management Company Limited
+    name_vi: Cong ty TNHH quan ly quy dau tu chung khoan Vietcombank
+    status: verified
+    verified_on: 2026-08-15
+    base_url: https://www.vcbf.com
+    listing_url: https://www.vcbf.com/quan-he-nha-dau-tu/bao-cao-cua-cac-quy-mo/bao-cao-thay-doi-gia-tri-tai-san-rong/
+    page_param: p
+    crawler: vcbf
+    # Observed 2026-08-15: 47 listing pages, 935 entries, 933 live links.
+    archive_earliest: 2022-07-01
+    archive_latest: 2026-08-12
+    # Container changed mid-archive. Both are Appendix XXIV with identical codes.
+    containers:
+      pdf: {from: 2022-07-01, to: 2022-11-30, count_observed: 88, text_layer: true}
+      xlsx: {from: 2022-12-01, to: 2026-08-12, count_observed: 845}
+    notes:
+      - Filings are published under /images/{year}/, but the year directory is
+        not reliable; vcbbcf_bc_tuan_20240102.xlsx is served from /images/2025/.
+        Take dates from the document, never from the path.
+      - Filenames carry an unpredictable trailing sequence suffix
+        (vcbbcf_bc_ky_20221121_2.pdf), so URLs must be enumerated, not built.
+      - Line 6.3 is printed as "20.54%" in PDF but stored as the fraction
+        0.2054 in XLSX. The parser normalises both to percent units.
+    # Confirmed by the 2026-08-15 full run. Every one of the 19 chain-continuity
+    # breaks in the panel traces to a gap below: 17 weeks VCBF never published,
+    # and 2 weeks it published as truncated files.
+    known_gaps:
+      - fund_key: vcbfif
+        label: Tuan 47/2024
+        published: 2024-11-22
+        kind: unlinked
+        reason: listing entry has href="javascript:void(0);"; no file published
+      - fund_key: vcbtbf
+        label: Tuan 38/2024
+        published: 2024-09-20
+        kind: unlinked
+        reason: listing entry has href="javascript:void(0);"; no file published
+      - fund_key: vcbbcf
+        label: week ending 2025-11-26
+        published: 2025-11-28
+        kind: truncated
+        reason: >-
+          server serves 4,096 bytes with a matching Content-Length; the zip
+          central directory is absent so the workbook cannot be opened. Sibling
+          funds' files for the same week are 40-47 KB. Not a transfer error and
+          not recoverable by refetching.
+      - fund_key: vcbaif
+        label: week ending 2025-11-26
+        published: 2025-11-28
+        kind: truncated
+        reason: >-
+          server serves 12,288 bytes with a matching Content-Length; truncated
+          the same way as the vcbbcf file for this week.
+    # Weeks absent from the listing entirely, so never published. 2025-05-29 to
+    # 2025-06-04 and 2023-10-12 to 2023-10-18 are missing for every fund, which
+    # points to a manager-wide publishing lapse rather than per-fund omissions.
+    unpublished_weeks:
+      all_funds:
+        - 2023-10-12/2023-10-18
+        - 2025-05-29/2025-06-04
+      vcbbcf: [2022-07-14/2022-07-20, 2022-09-22/2022-09-28, 2024-12-19/2024-12-25]
+      vcbfif: [2024-11-14/2024-11-20]
+      vcbtbf: [2023-10-26/2023-11-01, 2024-09-12/2024-09-18]
+      vcbmgf: [2023-07-13/2023-07-19]
+    funds:
+      vcbbcf:
+        code: VCBF-BCF
+        aliases: [VCBBCF, BCF]
+        name: VCBF Blue Chip Fund
+        name_vi: Quy Dau tu Co phieu hang dau VCBF
+        asset_class: equity
+        fmarket_id: 32
+      vcbmgf:
+        code: VCBF-MGF
+        aliases: [VCBMGF, MGF]
+        name: VCBF Midcap Growth Fund
+        name_vi: Quy Dau tu Co phieu Tang truong VCBF
+        asset_class: equity
+        fmarket_id: 46
+      vcbtbf:
+        code: VCBF-TBF
+        aliases: [VCBTBF, TBF]
+        name: VCBF Tactical Balanced Fund
+        name_vi: Quy Dau tu Can bang Chien luoc VCBF
+        asset_class: balanced
+        fmarket_id: 31
+      vcbfif:
+        code: VCBF-FIF
+        aliases: [VCBFIF, FIF]
+        name: VCBF Fixed Income Fund
+        name_vi: Quy Dau tu Trai phieu VCBF
+        asset_class: bond
+        fmarket_id: 33
+      vcbaif:
+        code: VCBF-AIF
+        aliases: [VCBAIF, AIF]
+        name: VCBF Active Income Fund
+        name_vi: Quy Dau tu Thu nhap Chu dong VCBF
+        asset_class: bond
+        fmarket_id: 82
+
+  # --- additional managers ------------------------------------------------
+
+  dcvfm:
+    name: Dragon Capital Vietfund Management
+    name_vi: Cong ty Co phan Quan ly Quy Dragon Capital Viet Nam
+    status: verified
+    verified_on: 2026-08-15
+    base_url: https://maintenance.dragoncapital.com.vn
+    sitemap_url: https://maintenance.dragoncapital.com.vn/sitemap.xml
+    listing_url: https://maintenance.dragoncapital.com.vn/sitemap.xml
+    main_listing_url: https://www.dragoncapital.com.vn/individual/vi/report
+    crawler: dcvfm
+    # Observed 2026-08-15: 50 report sitemaps, 27,712 unique report pages.
+    # Weekly files: DCDS 269, DCDE 148, DCBF 270, DCIP 269, DCBC 121.
+    archive_earliest: 2021-06-17
+    archive_latest: 2026-08-13
+    count_observed: 1077
+    notes:
+      - >-
+        The current Salesforce Experience Cloud disclosure page is a dead end:
+        its document list lives in nested shadow roots and filter changes expose
+        no replayable fetch or XHR endpoint. The pre-Salesforce WordPress site
+        remains live on the maintenance subdomain, whose 50 static report
+        sitemaps enumerate the archive.
+      - >-
+        Each report page links one Azure CDN file. File URLs must be read from
+        those pages, never constructed: suffixes and year directories are not
+        reliable. The 27,712-page sitemap walk is cached in
+        data/interim/dcvfm_pages.json and refreshed after 24 hours so newly
+        published filings cannot remain hidden behind a stale cache. Only page
+        slugs containing tuan or the legacy English week spelling are visited,
+        so daily and subweekly period pages are not requested.
+      - >-
+        DCVFM publishes weekly, subweekly-period and point-in-time files under
+        the Appendix XXIV title. Production discovery includes only _BC_TUAN_.
+        DCBF's _BC_Ky_ files are valid changes, but all 178 observed files are
+        subweekly windows overlapping _BC_TUAN_; including both would double
+        count flows. _BC_Ngay_ has no section-3 flow lines and is rejected by
+        the parser. Monthly output is aggregated from the weekly filings.
+      - >-
+        Dates come from the document, never the filename. The filename date is
+        retained only as an ordering aid.
+      - >-
+        Legacy VFM funds, ETFs and old Circular 183 Appendix 26 reports are out
+        of scope. Some legacy files are binary .xls and remain parse failures
+        rather than introducing a new parser dependency here.
+    known_gaps:
+      - fund_key: dcbc
+        label: week ending 2022-12-08
+        kind: broken-link
+        reason: >-
+          The enumerated Azure CDN URL returns HTTP 404 on repeated fetches;
+          the report page still advertises that exact URL.
+      - fund_key: dcip
+        label: week ending 2022-07-14
+        kind: empty-file
+        reason: >-
+          The enumerated Azure CDN URL repeatedly returns a zero-byte body;
+          the report page still advertises that exact URL.
+      - fund_key: dcip
+        label: week ending 2023-02-09
+        kind: empty-file
+        reason: >-
+          The enumerated Azure CDN URL repeatedly returns a zero-byte body;
+          the report page still advertises that exact URL.
+    known_quarantine:
+      - {fund_key: dcbf, file: DCBF_BC_TUAN_20210708.xlsx, reason: header spans 36 days}
+      - {fund_key: dcbf, file: DCBF_BC_TUAN_20230112.xlsx, reason: header spans 371 days}
+      - {fund_key: dcds, file: DCDS_BC_TUAN_20210624.xlsx, reason: header dates are reversed}
+    funds:
+      dcds:
+        code: DCDS
+        aliases: [DCDS]
+        name: DC Dynamic Securities Fund
+        name_vi: Quy Dau tu Chung khoan Nang dong DC
+        asset_class: equity
+        count_observed: 269
+      dcde:
+        code: DCDE
+        aliases: [DCDE]
+        name: DC Dividend Focus Equity Fund
+        name_vi: Quy Dau tu Co phieu Tap trung Co tuc DC
+        asset_class: equity
+        count_observed: 148
+      dcbf:
+        code: DCBF
+        aliases: [DCBF]
+        name: DC Bond Fund
+        name_vi: Quy Dau tu Trai phieu DC
+        asset_class: bond
+        count_observed: 270
+      dcip:
+        code: DCIP
+        aliases: [DCIP]
+        name: DC Income Plus Bond Fund
+        name_vi: Quy Dau tu Trai phieu Gia tang Thu nhap Co dinh DC
+        asset_class: bond
+        count_observed: 269
+      dcbc:
+        code: DCBC
+        aliases: [DCBC]
+        name: DC Blue Chip Fund
+        name_vi: Quy Dau tu Doanh nghiep Hang dau DC
+        asset_class: equity
+        count_observed: 121
+
+  ssiam:
+    name: SSI Asset Management Company Limited
+    name_vi: Cong Ty TNHH Quan Ly Quy SSI
+    status: verified
+    verified_on: 2026-08-15
+    base_url: https://ssiam.com.vn
+    listing_url: https://ssiam.com.vn/ssiam/thong-tin-chung-quy-ssibf
+    crawler: ssiam
+    notes:
+      - >-
+        There is no central disclosure listing. Every document a fund has ever
+        published is embedded on that fund's own information page, two to three
+        thousand links each, with no pagination.
+      - >-
+        SSIAM files a REDUCED Appendix XXIV. It carries lines 3.1, 3.2 and 3.3
+        but has no 3.2.1 or 3.2.2, so the gross subscription and redemption
+        legs are not disclosed at all. Only net flow is available for this
+        manager. The identity still closes off line 3.2. This is a disclosure
+        choice by the manager, not a parsing limitation.
+      - >-
+        The daily files named "Giatritaisanrongquymo" are point-in-time NAV
+        reports with no change section; the parser rejects them. Weekly change
+        reports are the ones whose names contain "thay doi".
+      - >-
+        Periods are written numerically in Vietnamese as
+        "tuan tu 21/11/2023 den 27/11/2023". The English half of these filings
+        reads "from Nov 21th 2023", which is month-first and malformed, so the
+        Vietnamese line is the only reliable one.
+      - >-
+        The nav-fund download endpoint returns a NAV time series with no flow
+        lines, so it cannot substitute for the filings. Its workbooks also
+        carry an empty pageMargins attribute that openpyxl refuses to load.
+    funds:
+      ssibf:
+        code: SSIBF
+        page: /ssiam/thong-tin-chung-quy-ssibf
+        aliases: [SSIBF]
+        name: SSI Bond Fund
+        asset_class: bond
+      ssi-sca:
+        code: SSI-SCA
+        page: /ssiam/thong-tin-chung-quy-ssi-sca
+        aliases: [SSI-SCA, SSISCA]
+        name: SSI Sustainable Competitive Advantage Fund
+        asset_class: equity
+      vlgf:
+        code: VLGF
+        page: /ssiam/thong-tin-chung-quy-vlgf
+        aliases: [VLGF]
+        name: Vietnam Long-term Growth Fund
+        asset_class: equity
+      ssi-ef:
+        code: SSI-EF
+        page: /ssiam/thong-tin-chung-quy-ssi-ef
+        aliases: [SSI-EF, SSIEF]
+        name: SSI Enhanced Fund
+        asset_class: equity
+
+  vinacapital:
+    name: VinaCapital Fund Management Joint Stock Company
+    name_vi: Cong Ty Co Phan Quan Ly Quy VinaCapital
+    status: verified
+    verified_on: 2026-08-15
+    base_url: https://vinacapital.com
+    listing_url: https://vinacapital.com/information-disclosure/
+    ajax_url: https://vinacapital.com/wp-admin/admin-ajax.php
+    crawler: vinacapital
+    notes:
+      - >-
+        The disclosure list is a WordPress admin-ajax action, not a paginated
+        page. POST action=filterdiscl for page 1 or loaddiscl for later pages,
+        with the serialised #formfilter under a "data" key. The form carries a
+        per-session CSRF token that must be read off the listing page first.
+      - >-
+        Each fund publishes BOTH a weekly and a daily file. Only the weekly is
+        the Appendix XXIV change report. The daily file is also titled
+        "Phu luc XXIV" and also carries a line 2.1, but it is a point-in-time
+        NAV snapshot whose 2.1 is the foreign certificate count rather than
+        closing NAV, and it has no section-3 flow lines at all. The crawler
+        filters to weekly and the parser rejects the daily variant outright.
+      - >-
+        Weekly and daily naming differs per fund. VEOF uses BC_Tuan and
+        BC_Ngay; VESAF uses BC_Weekly and BC_Daily. Both patterns are matched.
+      - >-
+        Filenames carry two dates. The leading one is the publication date and
+        the trailing one is the period end.
+      - >-
+        Resolves spec section 9 item 1. VinaCapital's own disclosure filter
+        offers a "vcfm" entity labelled "VinaCapital (VCFM)", and its filings
+        name the manager "VinaCapital Fund Management Joint Stock Company".
+        VCFM is therefore this firm, not a peer and not Viet Capital. The vcfm
+        slug carries corporate disclosures rather than fund NAV reports, so it
+        is not registered as a fund.
+    funds:
+      veof:
+        code: VINACAPITAL-VEOF
+        site_slug: veof
+        aliases: [VEOF]
+        name: VinaCapital Leading Enterprise Equity Fund
+        asset_class: equity
+      vesaf:
+        code: VINACAPITAL-VESAF
+        site_slug: vesaf
+        aliases: [VESAF]
+        name: VinaCapital Strategic Growth Equity Fund
+        asset_class: equity
+      vibf:
+        code: VINACAPITAL-VIBF
+        site_slug: vibf
+        aliases: [VIBF]
+        name: VinaCapital Integrated Balanced Fund
+        asset_class: balanced
+      vff:
+        code: VINACAPITAL-VFF
+        site_slug: vff
+        aliases: [VFF]
+        name: VinaCapital Enhanced Fixed Income Fund
+        asset_class: bond
+      vlbf:
+        code: VINACAPITAL-VLBF
+        site_slug: vlbf
+        aliases: [VLBF]
+        name: VinaCapital Liquidity Bond Fund
+        asset_class: bond
+
+mirrors:
+  vietstock:
+    status: unverified
+    base_url: https://finance.vietstock.vn
+    notes:
+      - Document lists load from a tokenised AJAX endpoint, not static links.
+        Probed 2026-08-15 at /VCBF-BCF/tai-tai-lieu.htm; the page carries no
+        static2.vietstock file URLs. Recovering the endpoint needs a
+        browser-driven session, so the mirror is not yet usable as a fallback.
+
+cross_checks:
+  fmarket:
+    status: verified
+    verified_on: 2026-08-15
+    # `toDate` must be a real YYYYMMDD; passing null fails with
+    # "Dinh dang ngay khong hop le". `fromDate` may be null with isAllData=1.
+    # navDate is the publication date, one day after the filing's dealing date.
+    publication_lag_days: 1
+    result_2026_08_15: 886 of 888 matched rows agree within 0.1 percent
+    filter_url: https://api.fmarket.vn/res/products/filter
+    nav_history_url: https://api.fmarket.vn/res/product/get-nav-history
+    notes:
+      - Returns NAV per certificate only. No units outstanding, no total NAV,
+        so it can never substitute for a filing; it is a parse cross-check.

@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+title: >-
+  vn-gross-flows: a panel of Vietnamese open-ended fund flows from Appendix XXIV
+  regulatory filings
+message: If you use this dataset, please cite it.
+type: dataset
+authors:
+  - name: 10thirtyLabs
+    email: mai@10thirtylabs.com
+abstract: >-
+  A reproducible panel of Vietnamese open-ended fund flows built from Appendix
+  XXIV of Circular 98/2020/TT-BTC, the Ministry of Finance template every
+  licensed fund files each dealing period. Unlike commercial fund databases,
+  which carry net flows only, this panel preserves the disclosed gross
+  subscription and redemption legs as separate series. 3,860 fund-period
+  observations across 19 funds and 4 managers, 2021-01 to 2026-08, every row
+  satisfying the NAV reconciliation identity to zero dong, with every excluded
+  row documented and a written reason.
+keywords:
+  - fund flows
+  - mutual funds
+  - Vietnam
+  - frontier markets
+  - flow-performance
+  - regulatory disclosure
+license: CC-BY-4.0
+version: 1.0.0
+date-released: '2026-08-16'

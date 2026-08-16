@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vn-gross-flows"
+version = "0.1.0"
+description = "A panel of Vietnamese open-ended fund flows from Appendix XXIV regulatory filings"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "10thirtyLabs", email = "mai@10thirtylabs.com" }]
+dependencies = [
+  "pandas>=2.0",
+  "pyyaml>=6.0",
+  "pdfplumber>=0.10",
+  "openpyxl>=3.1",
+  "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+# VN-Index ingestion. Kept optional so the parser and gates install and test
+# without it; macro.vnindex_daily imports it lazily.
+market = ["vnstock>=3.2"]
+dev = ["pytest>=8.0"]
+
+[tool.setuptools]
+packages = ["vngross"]
+
+[tool.setuptools.package-data]
+vngross = ["sources.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = [
+  # openpyxl drops the WMF signature image embedded in every VCBF workbook.
+  "ignore:wmf image format is not supported:UserWarning",
+]

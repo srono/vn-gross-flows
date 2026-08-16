@@ -1,0 +1,24 @@
+# Cached source filings, ~1GB. Never redistributed from this repository: they
+# are the managers' own documents, and one source signals ai-train=no. They are
+# fully reproducible from data/interim/refs_*.json via
+# `python -m vnflows.run fetch`, so the panel stays rebuildable byte-identically
+# without mirroring anyone's archive. See LICENSE-DATA and METHOD.md section 9.
+data/raw/
+
+# Run logs.
+data/interim/*.log
+
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+.DS_Store
+
+# Local Claude Code settings.
+.claude/
+
+# Dropped into the working directory by the vnstock package on import.
+# Third-party onboarding text, unrelated to this project.
+AGENTS.md
+vnai/

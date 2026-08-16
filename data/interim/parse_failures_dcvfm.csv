@@ -1,0 +1,4 @@
+manager_id,fund_key,fund_code,url,published,title,label,filename_date,error
+dcvfm,dcbc,DCBC,https://vfmcomvnaz.azureedge.net/dcvfmcomvn/uploads/vfm_files/report/2022/12/DCBC_BC_TUAN_20221208.xlsx,,DCBC_BC_TUAN_20221208.xlsx,,2022-12-08,not fetched
+dcvfm,dcip,DCIP,https://vfmcomvnaz.azureedge.net/dcvfmcomvn/uploads/vfm_files/report/2022/07/DCIP_BC_TUAN_20220714.xlsx,,DCIP_BC_TUAN_20220714.xlsx,,2022-07-14,not fetched
+dcvfm,dcip,DCIP,https://vfmcomvnaz.azureedge.net/dcvfmcomvn/uploads/vfm_files/report/2023/02/DCIP_BC_TUAN_20230209.xlsx,,DCIP_BC_TUAN_20230209.xlsx,,2023-02-09,not fetched
