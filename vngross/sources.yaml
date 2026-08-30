@@ -190,13 +190,7 @@ managers:
         name_vi: Quy Dau tu Chung khoan Nang dong DC
         asset_class: equity
         count_observed: 269
-      dcde:
-        code: DCDE
-        aliases: [DCDE]
-        name: DC Dividend Focus Equity Fund
-        name_vi: Quy Dau tu Co phieu Tap trung Co tuc DC
-        asset_class: equity
-        count_observed: 148
+
       dcbf:
         code: DCBF
         aliases: [DCBF]
@@ -211,13 +205,22 @@ managers:
         name_vi: Quy Dau tu Trai phieu Gia tang Thu nhap Co dinh DC
         asset_class: bond
         count_observed: 269
+      dcde:
+        code: DCDE
+        aliases: [DCDE, DCBC]
+        name: DC Dividend Focus Equity Fund
+        name_vi: Quy Dau tu Co phieu Tap trung Co tuc DC
+        asset_class: equity
+        count_observed: 148
+        identity_note: Canonical economic identity; renamed from DCBC on 2023-10-13.
       dcbc:
-        code: DCBC
+        code: DCDE
         aliases: [DCBC]
-        name: DC Blue Chip Fund
+        name: DC Dividend Focus Equity Fund (legacy DCBC filings)
         name_vi: Quy Dau tu Doanh nghiep Hang dau DC
         asset_class: equity
         count_observed: 121
+        legacy_alias_of: dcde
 
   ssiam:
     name: SSI Asset Management Company Limited

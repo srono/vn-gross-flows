@@ -258,18 +258,41 @@ def add_lagged_performance(
     enters a regressor. A flow and the return it is supposed to be responding to
     must not share a period, or the estimate picks up the mechanical effect of
     the flow itself on that period's NAV.
+
+    Returns are compounded as (1+r1)*(1+r2)*... - 1 and require exact consecutive
+    monthly periods. Non-consecutive gaps result in NaN.
     """
     out = panel.sort_values(["fund_code", time_col]).copy()
     grouped = out.groupby("fund_code", observed=True)
 
+    return_col = "total_return" if "total_return" in out.columns else "gross_return"
+    time_values = pd.to_datetime(out[time_col])
+    unique_times = pd.Series(time_values.dropna().unique()).sort_values()
+    monthly_input = time_col == "month" or (
+        len(unique_times) > 1
+        and unique_times.diff().dt.days.dropna().median() > 20
+    )
+
     for window in windows:
-        out[f"ret_lag{lags}_{window}"] = grouped["gross_return"].transform(
-            lambda s, w=window: s.shift(lags).rolling(w).sum()
-        )
-        if "excess_return" in out.columns:
-            out[f"exc_lag{lags}_{window}"] = grouped["excess_return"].transform(
-                lambda s, w=window: s.shift(lags).rolling(w).sum()
+        def compounded(series: pd.Series, w: int = window) -> pd.Series:
+            values = series.shift(lags).rolling(w, min_periods=w).apply(
+                lambda x: np.prod(1.0 + x) - 1.0, raw=True
             )
+            if monthly_input:
+                months = pd.PeriodIndex(
+                    pd.to_datetime(out.loc[series.index, time_col]), freq="M"
+                ).asi8
+                month_series = pd.Series(months, index=series.index)
+                consecutive = month_series.diff().eq(1)
+                valid = consecutive.rolling(w, min_periods=max(w - 1, 1)).sum().ge(w - 1)
+                if w == 1:
+                    valid[:] = True
+                values = values.where(valid)
+            return values
+
+        out[f"ret_lag{lags}_{window}"] = grouped[return_col].transform(compounded)
+        if "excess_return" in out.columns:
+            out[f"exc_lag{lags}_{window}"] = grouped["excess_return"].transform(compounded)
 
     if "nav_begin" in out.columns:
         out["log_nav_begin"] = np.log(out["nav_begin"].where(out["nav_begin"] > 0))
@@ -317,6 +340,7 @@ def flow_performance(
     dependent: str,
     regressors: list[str],
     fund_effects: bool = True,
+    month_effects: bool = False,
     cluster_on: str | None = "month",
     name: str | None = None,
     time_col: str = "period_end",
@@ -324,11 +348,11 @@ def flow_performance(
     """Estimate one flow-performance specification.
 
     Fund fixed effects are absorbed by demeaning rather than dummied, so the
-    reported R-squared is a within-R-squared. Clustering defaults to the time
-    dimension because the fund dimension is far too short to cluster on: with a
-    handful of funds, fund-clustered standard errors are not reliable, and
-    pretending otherwise would be the single easiest way to overstate this
-    panel's precision.
+    reported R-squared is a within-R-squared. Month fixed effects can be added
+    in addition to fund effects. Clustering defaults to the time dimension
+    because the fund dimension is far too short to cluster on: with a handful
+    of funds, fund-clustered standard errors are not reliable, and pretending
+    otherwise would be the single easiest way to overstate this panel's precision.
     """
     needed = [dependent, *regressors]
     frame = panel.dropna(subset=needed).copy()
@@ -342,6 +366,13 @@ def flow_performance(
     if fund_effects:
         frame = _demean(frame, needed, by="fund_code")
         absorbed = ("fund_code",)
+    if month_effects:
+        if "month" not in frame.columns:
+            frame["month"] = pd.PeriodIndex(pd.to_datetime(frame[time_col]), freq="M").astype(str)
+        frame = _demean(frame, needed, by="month")
+        absorbed = absorbed + ("month",) if absorbed else ("month",)
+
+    if fund_effects or month_effects:
         design = frame[regressors].to_numpy()
         terms = list(regressors)
     else:

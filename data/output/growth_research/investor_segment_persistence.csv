@@ -1,0 +1,9 @@
+sample,segment,lag_coefficient,std_error,t_stat,n_observations,n_funds,n_months,note
+all,foreign,0.1637712993817626,0.0748470027632413,2.1880809295705506,577,15,64,Validated net certificate demand; exact consecutive fund-months.
+all,domestic,0.19875264020699412,0.12158710148797282,1.6346523420221049,673,17,64,Validated net certificate demand; exact consecutive fund-months.
+equity_balanced,foreign,0.18073840945789987,0.0555725499787871,3.2522964939865187,407,10,64,Validated net certificate demand; exact consecutive fund-months.
+equity_balanced,domestic,0.4237174012471001,0.09377596217530348,4.518400999768029,453,11,64,Validated net certificate demand; exact consecutive fund-months.
+bond,foreign,-0.05510646383554724,0.16004819929670164,-0.34431167659305806,170,5,61,Validated net certificate demand; exact consecutive fund-months.
+bond,domestic,-0.0664276017262263,0.036862707985806084,-1.8020271802007635,220,6,62,Validated net certificate demand; exact consecutive fund-months.
+vinacapital,foreign,-0.06881143916468829,0.11636264659419042,-0.5913533352731752,230,5,64,Validated net certificate demand; exact consecutive fund-months.
+vinacapital,domestic,-0.07551043701870289,0.03433369231853522,-2.1993101213276205,237,5,64,Validated net certificate demand; exact consecutive fund-months.

@@ -1,0 +1,50 @@
+{
+  "analysis_sample_counts": {
+    "analysis_paired_monthly.csv": {
+      "n_obs": [
+        719
+      ],
+      "rows": 12
+    },
+    "analysis_paired_weekly.csv": {
+      "n_obs": [
+        3368
+      ],
+      "rows": 12
+    }
+  },
+  "build_timestamp_utc": "2026-08-17T05:23:07.822063+00:00",
+  "continuity_count": 79,
+  "economic_fund_count": 18,
+  "git_commit": "32ac7a8c170d9536738cc2f31fa1e05ede17ab3b",
+  "git_dirty": true,
+  "hashes": {
+    "vngross_fund_month.csv": "d1b5f60bc8a891ee33fa49ca80f421768fd8480774ac8e5b49c4f5426b984621",
+    "vngross_fund_period.csv": "5a1b6fb125d3febaf0425b3d45351ecdee64e41f54e7b227ac7ceedc4cdc5608"
+  },
+  "managers_included": [
+    "vcbf",
+    "dcvfm",
+    "ssiam",
+    "vinacapital"
+  ],
+  "month_rows": 950,
+  "parse_failure_count": 1497,
+  "period_rows": 3989,
+  "quarantine_count": 20,
+  "source_reference_counts": {
+    "dcvfm": 1077,
+    "ssiam": 737,
+    "vcbf": 933,
+    "vinacapital": 2873
+  },
+  "supersession_count": 114,
+  "versions": {
+    "numpy": "2.5.2",
+    "openpyxl": "3.1.5",
+    "pandas": "3.0.5",
+    "pdfplumber": "0.11.10",
+    "python": "3.14.6",
+    "vnstock": "4.0.2"
+  }
+}

@@ -96,6 +96,32 @@ def test_proxy_reports_gross_return(proxy: dict, filing: Filing) -> None:
     assert proxy["gross_return"] == pytest.approx(filing.gross_return)
 
 
+def test_prior_column_consistency_check(filing: Filing) -> None:
+    """Test that prior column consistency checking works."""
+    from vngross.reconcile import check_prior_column_consistency
+
+    # Add prior values that match current
+    filing.prior_values["nav_end"] = filing.values["nav_begin"]
+    filing.prior_values["nav_per_unit_end"] = filing.values["nav_per_unit_begin"]
+
+    check = check_prior_column_consistency(filing)
+    assert check.passed
+    assert "consistent" in check.detail
+
+
+def test_prior_column_mismatch_warning(filing: Filing) -> None:
+    """Test that prior column mismatches generate warnings."""
+    from vngross.reconcile import check_prior_column_consistency
+
+    # Add mismatched prior values
+    filing.prior_values["nav_end"] = filing.values["nav_begin"] * 0.9  # 10% off
+
+    check = check_prior_column_consistency(filing)
+    assert check.passed  # It's a warning, not a failure
+    assert "prior nav_end" in check.detail
+    assert "gap" in check.detail
+
+
 # --- chain continuity -----------------------------------------------------
 
 

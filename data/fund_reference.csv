@@ -1,0 +1,18 @@
+fund_code,fmarket_id,short_name,fund_name_vi,manager_name,inception_date,management_fee_pct,performance_fee_pct,min_holding_days,issue_price_vnd,source_url,retrieved_utc
+VINACAPITAL-VEOF,20,VEOF,QUỸ ĐẦU TƯ CỔ PHIẾU DOANH NGHIỆP HÀNG ĐẦU VINACAPITAL,VINACAPITAL,2014-07-01,1.75,,10,10000.0,https://api.fmarket.vn/res/products/20,2026-08-29T17:41:14+00:00
+VINACAPITAL-VESAF,23,VESAF,QUỸ ĐẦU TƯ CỔ PHIẾU TĂNG TRƯỞNG CHIẾN LƯỢC VINACAPITAL,VINACAPITAL,2017-04-18,1.75,,10,10000.0,https://api.fmarket.vn/res/products/23,2026-08-29T17:41:15+00:00
+VINACAPITAL-VFF,21,VFF,QUỸ ĐẦU TƯ TRÁI PHIẾU NÂNG CAO VINACAPITAL,VINACAPITAL,2013-04-01,0.95,,10,10000.0,https://api.fmarket.vn/res/products/21,2026-08-29T17:41:15+00:00
+VINACAPITAL-VIBF,22,VIBF,QUỸ ĐẦU TƯ CÂN BẰNG GẮN KẾT VINACAPITAL,VINACAPITAL,2019-07-02,1.75,,10,10000.0,https://api.fmarket.vn/res/products/22,2026-08-29T17:41:15+00:00
+VINACAPITAL-VLBF,53,VLBF,QUỸ ĐẦU TƯ TRÁI PHIẾU THANH KHOẢN VINACAPITAL,VINACAPITAL,2021-08-13,0.9,,0,10000.0,https://api.fmarket.vn/res/products/53,2026-08-29T17:41:16+00:00
+DCDS,28,DCDS,QUỸ ĐẦU TƯ CHỨNG KHOÁN NĂNG ĐỘNG DC,DCVFM,2004-05-20,1.95,,10,10000.0,https://api.fmarket.vn/res/products/28,2026-08-29T17:41:16+00:00
+DCBF,27,DCBF,QUỸ ĐẦU TƯ TRÁI PHIẾU DC,DCVFM,2013-06-10,1.2,,10,10000.0,https://api.fmarket.vn/res/products/27,2026-08-29T17:41:16+00:00
+DCIP,67,DCIP,QUỸ ĐẦU TƯ TRÁI PHIẾU GIA TĂNG THU NHẬP CỐ ĐỊNH DC,DCVFM,2021-05-24,1.2,,10,10000.0,https://api.fmarket.vn/res/products/67,2026-08-29T17:41:16+00:00
+DCDE,25,DCDE,QUỸ ĐẦU TƯ CỔ PHIẾU TẬP TRUNG CỔ TỨC DC,DCVFM,2008-02-28,1.93,,10,10000.0,https://api.fmarket.vn/res/products/25,2026-08-29T17:41:17+00:00
+SSIBF,8,SSIBF,QUỸ ĐẦU TƯ TRÁI PHIẾU SSI,SSIAM,2017-08-30,1.0,,0,10000.0,https://api.fmarket.vn/res/products/8,2026-08-29T17:41:17+00:00
+SSI-SCA,11,SSISCA,QUỸ ĐẦU TƯ LỢI THẾ CẠNH TRANH BỀN VỮNG SSI,SSIAM,2014-09-26,1.75,,0,10000.0,https://api.fmarket.vn/res/products/11,2026-08-29T17:41:17+00:00
+VLGF,49,VLGF,QUỸ ĐẦU TƯ TĂNG TRƯỞNG DÀI HẠN VIỆT NAM,SSIAM,2021-11-16,1.5,,0,10000.0,https://api.fmarket.vn/res/products/49,2026-08-29T17:41:18+00:00
+VCBF-BCF,32,VCBF-BCF,QUỸ ĐẦU TƯ CỔ PHIẾU HÀNG ĐẦU VCBF,VIETCOMBANK FUND,2014-08-22,1.9,1.9,5,10000.0,https://api.fmarket.vn/res/products/32,2026-08-29T17:41:18+00:00
+VCBF-MGF,46,VCBF-MGF,QUỸ ĐẦU TƯ CỔ PHIẾU TĂNG TRƯỞNG VCBF,VIETCOMBANK FUND,2021-10-29,1.9,,5,10000.0,https://api.fmarket.vn/res/products/46,2026-08-29T17:41:18+00:00
+VCBF-TBF,31,VCBF-TBF,QUỸ ĐẦU TƯ CÂN BẰNG CHIẾN LƯỢC VCBF,VIETCOMBANK FUND,2013-12-24,1.5,0.0,5,10000.0,https://api.fmarket.vn/res/products/31,2026-08-29T17:41:19+00:00
+VCBF-FIF,33,VCBF-FIF,QUỸ ĐẦU TƯ TRÁI PHIẾU VCBF,VIETCOMBANK FUND,2019-08-09,0.8,0.1,5,10000.0,https://api.fmarket.vn/res/products/33,2026-08-29T17:41:19+00:00
+VCBF-AIF,82,VCBF-AIF,QUỸ ĐẦU TƯ THU NHẬP CHỦ ĐỘNG VCBF,VIETCOMBANK FUND,,1.9,,5,10000.0,https://api.fmarket.vn/res/products/82,2026-08-29T17:41:19+00:00

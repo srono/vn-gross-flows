@@ -9,13 +9,12 @@ authors:
     email: mai@10thirtylabs.com
 abstract: >-
   A reproducible panel of Vietnamese open-ended fund flows built from Appendix
-  XXIV of Circular 98/2020/TT-BTC, the Ministry of Finance template every
-  licensed fund files each dealing period. Unlike commercial fund databases,
-  which carry net flows only, this panel preserves the disclosed gross
-  subscription and redemption legs as separate series. 3,860 fund-period
-  observations across 19 funds and 4 managers, 2021-01 to 2026-08, every row
-  satisfying the NAV reconciliation identity to zero dong, with every excluded
-  row documented and a written reason.
+  XXIV of Circular 98/2020/TT-BTC. The dataset preserves disclosed gross
+  subscription and redemption legs, canonicalises DCBC as DCDE's legacy
+  identity, validates within- and cross-filing boundaries independently of the
+  NAV identity, and documents every exclusion. The current corrected build has
+  18 economic funds across 4 managers. Forecast features are strictly lagged;
+  bond and deposit-rate results are exploratory.
 keywords:
   - fund flows
   - mutual funds
@@ -24,5 +23,5 @@ keywords:
   - flow-performance
   - regulatory disclosure
 license: CC-BY-4.0
-version: 1.0.0
+version: 1.1.0
 date-released: '2026-08-16'

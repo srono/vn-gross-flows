@@ -1,0 +1,9 @@
+group,driver,posterior_inclusion_probability,prior_inclusion_probability,bayes_factor_vs_prior,n_fund_months,n_months_effective,best_model_terms
+bond,deposit_rate_pct,0.9949146319283523,0.5,195.64260008538332,110,37,
+bond,gold_return,0.19469979983224311,0.5,0.241772943545381,110,37,
+bond,usdvnd_return,0.16004732409572942,0.5,0.19054326355163612,110,37,
+bond,__best_model__,0.6776158723406586,,,110,37,deposit_rate_pct
+equity_balanced,deposit_rate_pct,0.9472706249726938,0.5,17.96476109345396,335,37,
+equity_balanced,gold_return,0.9451414098987095,0.5,17.22868575648058,335,37,
+equity_balanced,usdvnd_return,0.1458266143624187,0.5,0.1707224982824409,335,37,
+equity_balanced,__best_model__,0.7663224479396599,,,335,37,"deposit_rate_pct, gold_return"

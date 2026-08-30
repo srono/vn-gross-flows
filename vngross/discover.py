@@ -286,6 +286,27 @@ _VC_WEEKLY_RE = re.compile(r"[-_](?:tuan|tuần|weekly)[-_]", re.IGNORECASE)
 _VC_DAILY_RE = re.compile(r"[-_](?:ngay|ngày|daily)[-_]", re.IGNORECASE)
 
 
+def _vc_fund_key_from_url(url: str, funds: dict) -> str | None:
+    """Extract fund identity from VinaCapital filename.
+
+    VinaCapital filenames follow patterns like:
+      20260811_VEOF_BC_Tuan_Ky-so_20260810.xlsx
+      20260714_VESAF_BC_Weekly_20260713.xlsx
+    The fund code appears after the date prefix.
+    """
+    name = url.rsplit("/", 1)[-1].upper()
+    # Match against both fund_key and site_slug
+    for key, meta in funds.items():
+        # Check fund_key itself
+        if re.search(rf"(?:^|[^A-Z0-9]){re.escape(key.upper())}(?:[^A-Z0-9]|$)", name):
+            return key
+        # Check site_slug if different from fund_key
+        slug = (meta or {}).get("site_slug", key)
+        if slug != key and re.search(rf"(?:^|[^A-Z0-9]){re.escape(slug.upper())}(?:[^A-Z0-9]|$)", name):
+            return key
+    return None
+
+
 def _discover_vinacapital(
     manager_id: str,
     cfg: dict,
@@ -387,12 +408,42 @@ def _discover_vinacapital(
                     )
                     continue
 
+                # Prefer filename identity over page filter
+                file_fund_key = _vc_fund_key_from_url(absolute, funds)
+                if file_fund_key is None:
+                    dead.append(
+                        DeadRef(
+                            manager_id=manager_id,
+                            fund_key=None,
+                            title=name,
+                            published=_filename_date(name),
+                            reason="weekly filename has no registered fund identifier",
+                        )
+                    )
+                    continue
+
+                # Emit warning if page filter and filename identity disagree
+                if file_fund_key != fund_key:
+                    dead.append(
+                        DeadRef(
+                            manager_id=manager_id,
+                            fund_key=file_fund_key,
+                            title=name,
+                            published=_filename_date(name),
+                            reason=(
+                                f"page filter matched {fund_key!r} but filename identity "
+                                f"is {file_fund_key!r}; filename identity used"
+                            ),
+                        )
+                    )
+
                 found_on_page += 1
+                file_meta = funds[file_fund_key]
                 refs.append(
                     FilingRef(
                         manager_id=manager_id,
-                        fund_key=fund_key,
-                        fund_code=(meta or {}).get("code", fund_key.upper()),
+                        fund_key=file_fund_key,
+                        fund_code=(file_meta or {}).get("code", file_fund_key.upper()),
                         url=absolute,
                         published=_filename_date(name),
                         title=name,

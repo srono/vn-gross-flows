@@ -12,7 +12,10 @@ Design rules enforced here, from spec section 4:
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
+from datetime import date
+from urllib.parse import unquote
 
 import pandas as pd
 
@@ -20,6 +23,7 @@ from .appendix_xxiv import Filing
 from .reconcile import (
     chain_continuity,
     check_net_flow_consistency,
+    check_prior_column_consistency,
     proxy_divergence,
     reconcile,
 )
@@ -27,6 +31,9 @@ from .reconcile import (
 __all__ = [
     "PanelResult",
     "deduplicate",
+    "filename_report_date",
+    "filename_date_conflict",
+    "ADJUDICATED_FILENAME_DATE_ERRORS",
     "build_fund_period_panel",
     "attach_market_return",
     "attach_deposit_rate",
@@ -49,6 +56,38 @@ FLOW_COLUMNS = [
 ]
 
 
+def _normalize_fund_meta(fund_meta: dict[str, dict]) -> dict[str, dict]:
+    """Normalize fund metadata codes to canonical forms.
+
+    Handles DCBC/DCDE mapping: if input metadata maps both DCBC and DCDE to DCDE,
+    ensure consistent canonical handling.
+    """
+    normalized = {}
+
+    # Detect if both DCBC and DCDE exist and map to the same canonical code
+    dcbc_meta = fund_meta.get("DCBC")
+    dcde_meta = fund_meta.get("DCDE")
+
+    for code, meta in fund_meta.items():
+        # If DCBC and DCDE both exist and DCBC should map to DCDE
+        if code == "DCBC" and dcde_meta is not None:
+            # Check if metadata indicates they should be treated as same fund
+            if dcbc_meta and dcde_meta:
+                # Use DCDE as canonical, mark DCBC as alias
+                meta_copy = meta.copy()
+                meta_copy["canonical_code"] = "DCDE"
+                meta_copy["is_alias"] = True
+                normalized[code] = meta_copy
+                continue
+
+        meta_copy = meta.copy()
+        meta_copy.setdefault("canonical_code", code)
+        meta_copy.setdefault("is_alias", False)
+        normalized[code] = meta_copy
+
+    return normalized
+
+
 @dataclass
 class PanelResult:
     panel: pd.DataFrame
@@ -56,6 +95,7 @@ class PanelResult:
     quarantine: pd.DataFrame
     continuity_breaks: pd.DataFrame
     diagnostics: pd.DataFrame
+    period_corrections: pd.DataFrame
 
 
 def _derive_flow_measures(frame: pd.DataFrame) -> pd.DataFrame:
@@ -78,21 +118,180 @@ def _derive_flow_measures(frame: pd.DataFrame) -> pd.DataFrame:
     no_flow = legs_absent & frame["net_flow"].fillna(0.0).eq(0.0)
     undisclosed = legs_absent & ~no_flow
 
-    subs = frame["subscriptions"].fillna(0.0).mask(undisclosed)
-    reds = frame["redemptions"].fillna(0.0).abs().mask(undisclosed)
+    # ``gross_legs_disclosed`` is literal source semantics: both printed lines
+    # must be present. A net-only zero is useful but remains an inference.
+    both_present = frame["subscriptions"].notna() & frame["redemptions"].notna()
+    subs = pd.to_numeric(frame["subscriptions"], errors="coerce").where(both_present)
+    reds = pd.to_numeric(frame["redemptions"], errors="coerce").abs().where(both_present)
 
     frame["gross_subscription_rate"] = subs / nav_begin
     frame["gross_redemption_rate"] = reds / nav_begin
     frame["net_flow_rate"] = frame["net_flow"] / nav_begin
     frame["churn_rate"] = (subs + reds) / nav_begin
-    frame["gross_legs_disclosed"] = ~undisclosed
+    frame["gross_legs_disclosed"] = both_present
+    frame["gross_legs_inferred_zero"] = no_flow
 
     gross_total = subs + reds
-    frame["flow_asymmetry"] = ((subs - reds) / gross_total).where(gross_total > 0)
+    # Prevent division by zero in flow_asymmetry - compute safely
+    asymmetry = pd.Series(index=frame.index, dtype="float64")
+    nonzero_mask = gross_total > 0
+    asymmetry[nonzero_mask] = (subs[nonzero_mask] - reds[nonzero_mask]) / gross_total[nonzero_mask]
+    frame["flow_asymmetry"] = asymmetry
     return frame
 
 
-def deduplicate(filings: list[Filing]) -> tuple[list[Filing], list[dict]]:
+_FILENAME_DATE_RE = re.compile(r"(20[12][0-9])([01][0-9])([0-3][0-9])")
+
+
+def filename_report_date(source: str | None) -> date | None:
+    """The dealing date a filing's own filename claims, if it carries one.
+
+    Managers name these files after the period they close, so the filename is a
+    second, independent statement of the date the printed header also makes.
+    Where the two agree, which is 3,300 of the 3,528 rows that carry a parseable
+    filename date, neither adds anything. Where they disagree, one of them is a
+    typing mistake, and which one is not decidable from the filename alone: the
+    2023 SSIBF files transpose day and month in the *filename* while the header
+    is right, and two VCBF files carry the previous year in the filename.
+
+    So this function only reports what the filename says. Deciding whose mistake
+    it is belongs to `_reanchor_stale_periods`, which uses corroborating
+    evidence rather than a preference for one source over the other.
+    """
+    if not source:
+        return None
+    text = unquote(str(source))
+    best: date | None = None
+    for match in _FILENAME_DATE_RE.finditer(text):
+        year, month, day = (int(g) for g in match.groups())
+        try:
+            candidate = date(year, month, day)
+        except ValueError:
+            continue
+        if date(2013, 1, 1) <= candidate <= date(2027, 12, 31):
+            best = candidate
+    return best
+
+
+# Filings whose *filename* carries the wrong date while the printed reporting
+# period is right, confirmed one by one against the documents on 2026-08-17.
+# The panel keeps the printed period for every one of them; this list exists so
+# that a conflict already looked at stays quiet while a new one does not.
+#
+#   DCBC_BC_TUAN_20221206      month typed as 12 for 01; period ends 2022-01-06
+#   ...-TT98-2023030{7}/10/17/24  day and month transposed across four weeks
+#   vcbbcf_bc_tuan_2024010{2,8}   year not rolled over at the new year
+#   20210831-0906-*, 20240215-VLBF-*  filename names the whole span or the
+#                                     publication date, so only the extractor
+#                                     disagreed, never the document
+ADJUDICATED_FILENAME_DATE_ERRORS = frozenset(
+    {
+        "DCBC_BC_TUAN_20221206.xlsx",
+        "SSIBF_Bao-cao-ve-thay-doi-GTTSR-quy-mo-PLXXIV-TT98-20230307.pdf",
+        "SSIBF_Bao-cao-ve-thay-doi-GTTSR-quy-mo-PLXXIV-TT98-20230310.pdf",
+        "Copy of SSIBF_Bao-cao-ve-thay-doi-GTTSR-quy-mo-PLXXIV-TT98-20230317.pdf",
+        "SSIBF_Bao-cao-ve-thay-doi-GTTSR-quy-mo-PLXXIV-TT98-20230324.pdf",
+        "vcbbcf_bc_tuan_20240102.xlsx",
+        "vcbbcf_bc_tuan_20240108.xlsx",
+        "20210831-0906-veof-changes-of-nav-weekly-report.xlsx",
+        "20210831-0906-vesaf-changes-of-nav-weekly-report.xlsx",
+        "20210909-15-vlbf-changes-of-nav-weekly-report.xlsx",
+        "20240215-VLBF-NAV-TUAN-TU-01.02.2024-den-07.02.2024.xlsx",
+    }
+)
+
+# A filename and a header can disagree by a day or two for honest reasons: some
+# managers name the file after the publication date rather than the dealing
+# date. Beyond this the two are telling different stories.
+FILENAME_DATE_TOLERANCE_DAYS = 4
+
+
+def filename_date_conflict(source: str | None, period_end) -> bool:
+    """Does the filename's date contradict the printed period it closes?
+
+    Reported, never acted on. The two defects behind a conflict point opposite
+    ways and only the document settles which: SSIAM has published a stale
+    header over a correct filename, and separately a transposed filename over a
+    correct header. `_reanchor_stale_periods` repairs the first because a
+    collision corroborates it; this flag exists so the second is visible rather
+    than silent.
+    """
+    stamped = filename_report_date(source)
+    if stamped is None or period_end is None:
+        return False
+    return abs((stamped - period_end).days) > FILENAME_DATE_TOLERANCE_DAYS
+
+
+def _reanchor_stale_periods(filings: list[Filing]) -> list[dict]:
+    """Repair filings whose printed period is a stale copy of an earlier one.
+
+    SSIAM's weekly template is edited from the previous week's file, and four
+    times the figures were updated while the reporting-period line was not. The
+    2025-11-10 filing prints "tuần từ 28/10/2025 đến 03/11/2025" and then gives
+    the 4-10 November NAVs underneath it.
+
+    Left alone this is worse than a missing week. Deduplication keys on the
+    declared period, so the stale filing collides with the correctly labelled
+    one for that week, supersedes it, and publishes the wrong figures under the
+    right dates while its own week disappears entirely.
+
+    The repair only fires on self-evident evidence: two or more filings claiming
+    one period, where at least one filename agrees with the period it claims and
+    another does not. That corroboration is what separates this from the
+    opposite defect, a mistyped filename over a correct header, which never
+    produces a collision and is therefore never touched here. The period is
+    re-anchored to the filename's date, keeping the printed span, and every
+    change is returned for the audit trail rather than applied quietly.
+    """
+    by_period: dict[tuple, list[Filing]] = {}
+    for filing in filings:
+        if filing.period_start is None or filing.period_end is None:
+            continue
+        by_period.setdefault(
+            (filing.fund_code, filing.period_start, filing.period_end), []
+        ).append(filing)
+
+    corrections: list[dict] = []
+    for (fund_code, start, end), group in by_period.items():
+        if len({f.source for f in group}) < 2:
+            continue
+        dated = {id(f): filename_report_date(f.source) for f in group}
+        if not any(d == end for d in dated.values()):
+            continue
+        span = end - start
+        for filing in group:
+            claimed = dated[id(filing)]
+            if claimed is None or claimed == end:
+                continue
+            corrections.append(
+                {
+                    "fund_code": fund_code,
+                    "source": filing.source,
+                    "printed_period_start": start,
+                    "printed_period_end": end,
+                    "corrected_period_start": claimed - span,
+                    "corrected_period_end": claimed,
+                    "reason": (
+                        "printed reporting period duplicates a filing whose own "
+                        "filename matches it; re-anchored to this filing's "
+                        "filename date, printed span preserved"
+                    ),
+                }
+            )
+            filing.period_start = claimed - span
+            filing.period_end = claimed
+    if corrections:
+        log.warning(
+            "re-anchored %d filing(s) whose printed period was stale; see "
+            "period_corrections.csv",
+            len(corrections),
+        )
+    return corrections
+
+
+def deduplicate(
+    filings: list[Filing],
+) -> tuple[list[Filing], list[dict], list[dict], list[dict]]:
     """Collapse filings that describe the same fund-period.
 
     VCBF republishes a filing under a new sequence suffix without withdrawing
@@ -106,7 +305,11 @@ def deduplicate(filings: list[Filing]) -> tuple[list[Filing], list[dict]]:
     reports. The longer window supersedes the shorter cumulative snapshot;
     retaining both would count the shared days twice. Every displaced row is
     returned for the audit trail rather than discarded.
+
+    Returns: (kept, superseded_rows, overlap_quarantine_rows, period_corrections)
     """
+    period_corrections = _reanchor_stale_periods(filings)
+
     ordered = sorted(
         filings,
         key=lambda f: (
@@ -166,7 +369,50 @@ def deduplicate(filings: list[Filing]) -> tuple[list[Filing], list[dict]]:
                 }
             )
 
-    return kept, superseded
+    # Check for overlapping periods (not exact duplicates) - do this on final kept list
+    overlap_quarantine: list[dict] = []
+    by_fund: dict[str, list[Filing]] = {}
+    for filing in kept:
+        code = filing.fund_code or "_unknown"
+        by_fund.setdefault(code, []).append(filing)
+
+    for fund_code, fund_filings in by_fund.items():
+        sorted_filings = sorted(
+            fund_filings,
+            key=lambda f: (f.period_start or pd.Timestamp.min.date(), f.period_end or pd.Timestamp.min.date())
+        )
+
+        to_remove_indices = set()
+        for i, curr in enumerate(sorted_filings):
+            if i in to_remove_indices or curr.period_start is None or curr.period_end is None:
+                continue
+
+            # Check for overlaps with subsequent filings
+            for j, next_filing in enumerate(sorted_filings[i+1:], start=i+1):
+                if j in to_remove_indices or next_filing.period_start is None or next_filing.period_end is None:
+                    continue
+
+                # Filing windows use inclusive dates, and many managers repeat
+                # the prior closing boundary as the next opening boundary. That
+                # shared boundary is supported and not an overlap; only a start
+                # strictly before the preceding end is quarantined.
+                if curr.period_end > next_filing.period_start and curr.period_start < next_filing.period_start:
+                    overlap_quarantine.append({
+                        **curr.as_row(),
+                        "quarantine_reason": (
+                            f"period overlap: {curr.period_start} to {curr.period_end} "
+                            f"overlaps with {next_filing.period_start} to {next_filing.period_end}"
+                        ),
+                        "overlaps_with": next_filing.source,
+                    })
+                    to_remove_indices.add(i)
+                    break
+
+        # Remove quarantined filings from kept
+        if to_remove_indices:
+            kept = [f for f in kept if f not in [sorted_filings[idx] for idx in to_remove_indices]]
+
+    return kept, superseded, overlap_quarantine, period_corrections
 
 
 def build_fund_period_panel(
@@ -178,20 +424,43 @@ def build_fund_period_panel(
     Failures go to `quarantine` carrying the residual and a written reason, so
     the exclusion list is itself auditable.
     """
-    filings, superseded = deduplicate(filings)
+    # Normalize fund codes: canonical DCBC/DCDE handling
+    if fund_meta:
+        fund_meta = _normalize_fund_meta(fund_meta)
+        canonical = {
+            code: meta.get("canonical_code", code) for code, meta in fund_meta.items()
+        }
+        for filing in filings:
+            filing.fund_code = canonical.get(filing.fund_code, filing.fund_code)
+
+    filings, superseded, overlap_quarantine, period_corrections = deduplicate(filings)
+    filings = sorted(
+        filings,
+        key=lambda filing: (
+            filing.fund_code or "",
+            filing.period_start or pd.Timestamp.min.date(),
+            filing.period_end or pd.Timestamp.min.date(),
+        ),
+    )
 
     kept: list[dict] = []
     kept_filings: list[Filing] = []
     quarantined: list[dict] = []
     diagnostics: list[dict] = []
+    last_accepted: dict[str | None, Filing] = {}
 
     for filing in filings:
         row = filing.as_row()
         identity = reconcile(filing)
         net_check = check_net_flow_consistency(filing)
+        prior_check = check_prior_column_consistency(filing)
 
         row["reconcile_residual_vnd"] = identity.residual_vnd
         row["net_flow_residual_vnd"] = net_check.residual_vnd
+        row["prior_column_warnings"] = prior_check.detail if "consistent" not in prior_check.detail else None
+        row["filename_date_conflict"] = filename_date_conflict(
+            filing.source, filing.period_end
+        )
 
         diagnostic = proxy_divergence(filing)
         diagnostic["source"] = filing.source
@@ -214,29 +483,89 @@ def build_fund_period_panel(
                 f"[{MIN_PERIOD_DAYS}, {MAX_PERIOD_DAYS}]; header dates suspect"
             )
 
+        # An internally consistent 10x/100x/1000x parse can satisfy the NAV
+        # identity. For an adjacent filing, independently require its opening
+        # NAV and NAV/unit to chain to the last accepted close. Calendar gaps
+        # remain continuity warnings; extreme mismatches on a contiguous
+        # boundary are quarantined.
+        previous = last_accepted.get(filing.fund_code)
+        if not reasons and previous and filing.period_start and previous.period_end:
+            gap_days = (filing.period_start - previous.period_end).days
+            if 0 <= gap_days <= 3:
+                checks = (
+                    ("nav", filing.values.get("nav_begin"), previous.values.get("nav_end")),
+                    (
+                        "nav_per_unit",
+                        filing.values.get("nav_per_unit_begin"),
+                        previous.values.get("nav_per_unit_end"),
+                    ),
+                )
+                for check_name, current, prior in checks:
+                    if current not in (None, 0) and prior not in (None, 0):
+                        ratio = current / prior
+                        if ratio < 0.2 or ratio > 5.0:
+                            reasons.append(
+                                f"contiguous {check_name} chain mismatch: opening/prior "
+                                f"closing ratio {ratio:.6g} after {previous.period_end}"
+                            )
+
         if reasons:
             quarantined.append({**row, "quarantine_reason": "; ".join(reasons)})
             continue
         kept.append(row)
         kept_filings.append(filing)
+        last_accepted[filing.fund_code] = filing
+
+    # Merge overlap quarantine with other quarantined rows
+    quarantined.extend(overlap_quarantine)
 
     panel = pd.DataFrame(kept)
     if not panel.empty:
         panel = _derive_flow_measures(panel)
         if fund_meta:
-            meta = pd.DataFrame.from_dict(fund_meta, orient="index")
-            meta.index.name = "fund_code"
-            panel = panel.merge(meta.reset_index(), on="fund_code", how="left")
+            # Metadata may contain a legacy and canonical entry for one economic
+            # code. Keep the canonical (non-alias) row for the many-to-one join.
+            meta_rows = []
+            for source_code, values in fund_meta.items():
+                canonical_code = values.get("canonical_code", source_code)
+                meta_rows.append({"fund_code": canonical_code, **values})
+            meta = pd.DataFrame(meta_rows).sort_values("is_alias").drop_duplicates(
+                "fund_code", keep="first"
+            )
+            panel = panel.merge(meta, on="fund_code", how="left")
         panel = panel.sort_values(["fund_code", "period_end"]).reset_index(drop=True)
 
     # Continuity is checked on the exact accepted objects. A quarantined filing
     # cannot bridge two panel rows: doing so would hide the gap created by its
     # exclusion and make continuity_breaks disagree with the published panel.
+    # A filename that contradicts its own header is a source typo in one place
+    # or the other, and only reading the document settles which. Those already
+    # read are listed above and stay quiet; anything else is surfaced here so it
+    # is adjudicated rather than inherited.
+    unreviewed = sorted(
+        {
+            str(f.source).rsplit("/", 1)[-1]
+            for f in kept_filings
+            if filename_date_conflict(f.source, f.period_end)
+            and unquote(str(f.source).rsplit("/", 1)[-1])
+            not in ADJUDICATED_FILENAME_DATE_ERRORS
+        }
+    )
+    if unreviewed:
+        log.warning(
+            "%d filing(s) whose filename date contradicts the printed period have "
+            "not been adjudicated; the printed period is used. Review and add to "
+            "ADJUDICATED_FILENAME_DATE_ERRORS: %s",
+            len(unreviewed),
+            ", ".join(unreviewed[:5]),
+        )
+
     breaks = [c.as_row() for c in chain_continuity(kept_filings) if not c.passed]
 
     return PanelResult(
         panel=panel,
         superseded=pd.DataFrame(superseded),
+        period_corrections=pd.DataFrame(period_corrections),
         quarantine=pd.DataFrame(quarantined),
         continuity_breaks=pd.DataFrame(breaks),
         diagnostics=pd.DataFrame(diagnostics),
@@ -252,6 +581,10 @@ def attach_market_return(
     falling on a weekend or a Tet holiday does not create a gap. Aligning to a
     fixed calendar week instead would misalign flow and return by a day or more
     whenever a dealing period shifts around a public holiday.
+
+    For contiguous periods within the same fund, uses the previous period's index_end
+    as the current period's index_begin to eliminate compounding errors. Gaps or
+    first periods fall back to asof lookup and are flagged.
     """
     if panel.empty:
         return panel.copy()
@@ -267,18 +600,71 @@ def attach_market_return(
     index = index.dropna(subset=["close"]).sort_values("time").reset_index(drop=True)
 
     out = panel.copy()
-    for boundary, column in (("period_start", "index_begin"), ("period_end", "index_end")):
-        keys = pd.to_datetime(out[boundary]).astype("datetime64[ns]")
-        frame = pd.DataFrame({"time": keys, "_row": range(len(out))}).sort_values("time")
-        merged = pd.merge_asof(
-            frame, index, on="time", direction="backward", allow_exact_matches=True
-        )
-        out[column] = merged.sort_values("_row")["close"].to_numpy()
+
+    # First pass: get index_end for all rows using asof logic
+    keys = pd.to_datetime(out["period_end"]).astype("datetime64[ns]")
+    frame = pd.DataFrame({"time": keys, "_row": range(len(out))}).sort_values("time")
+    merged = pd.merge_asof(
+        frame, index, on="time", direction="backward", allow_exact_matches=True
+    )
+    out["index_end"] = merged.sort_values("_row")["close"].to_numpy()
+
+    # Second pass: set index_begin using contiguous logic
+    out = out.sort_values(["fund_code", "period_end"]).reset_index(drop=True)
+    out["index_begin"] = None
+    out["market_boundary_source"] = None
+
+    for fund_code in out["fund_code"].dropna().unique():
+        fund_mask = out["fund_code"] == fund_code
+        fund_rows = out[fund_mask].copy()
+
+        for idx in fund_rows.index:
+            if idx == 0 or out.loc[idx-1, "fund_code"] != fund_code:
+                # First period for this fund: use asof lookup
+                start_time = pd.to_datetime(out.loc[idx, "period_start"]).asm8
+                asof_val = index[index["time"] <= start_time]
+                if not asof_val.empty:
+                    out.loc[idx, "index_begin"] = asof_val.iloc[-1]["close"]
+                    out.loc[idx, "market_boundary_source"] = "first_period_asof"
+            else:
+                prev_idx = idx - 1
+                # Check if contiguous (current start <= previous end + tolerance)
+                curr_start = out.loc[idx, "period_start"]
+                prev_end = out.loc[prev_idx, "period_end"]
+
+                if pd.notna(curr_start) and pd.notna(prev_end):
+                    gap_days = (curr_start - prev_end).days
+
+                    if 0 <= gap_days <= 7:  # Contiguous or small gap
+                        # Use previous period's index_end
+                        out.loc[idx, "index_begin"] = out.loc[prev_idx, "index_end"]
+                        out.loc[idx, "market_boundary_source"] = "contiguous"
+                    else:
+                        # Gap too large: use asof lookup and flag
+                        start_time = pd.to_datetime(curr_start).asm8
+                        asof_val = index[index["time"] <= start_time]
+                        if not asof_val.empty:
+                            out.loc[idx, "index_begin"] = asof_val.iloc[-1]["close"]
+                            out.loc[idx, "market_boundary_source"] = f"gap_{gap_days}d_asof"
+                else:
+                    # Missing dates: fall back to asof
+                    start_time = pd.to_datetime(out.loc[idx, "period_start"]).asm8
+                    asof_val = index[index["time"] <= start_time]
+                    if not asof_val.empty:
+                        out.loc[idx, "index_begin"] = asof_val.iloc[-1]["close"]
+                        out.loc[idx, "market_boundary_source"] = "missing_date_asof"
 
     # The index level at period_start is the last close at or before the first
     # dealing day, which is the level flows and NAV are struck against.
     out["market_return"] = out["index_end"] / out["index_begin"] - 1.0
-    out["excess_return"] = out["gross_return"] - out["market_return"]
+
+    # Preserve gross_return compatibility but use total_return for excess when available
+    if "total_return" in out.columns:
+        out["excess_return"] = out["total_return"] - out["market_return"]
+        out["excess_return_gross"] = out["gross_return"] - out["market_return"]
+    else:
+        out["excess_return"] = out["gross_return"] - out["market_return"]
+
     return out
 
 
@@ -362,7 +748,26 @@ def to_monthly(panel: pd.DataFrame) -> pd.DataFrame:
         period_days=("period_days", "sum"),
     ).reset_index()
 
+    # `sum` returns 0.0 for an all-missing group, which would turn a manager's
+    # undisclosed gross legs into a disclosed zero and defeat the guard in
+    # `_derive_flow_measures`. A month inherits the weaker of its periods: if
+    # any period inside it withheld the decomposition, the month's legs are
+    # unknown, and the same rule downstream decides whether unknown-with-no-net
+    # is simply a quiet month.
+    if "gross_legs_disclosed" in frame.columns:
+        undisclosed = (
+            grouped["gross_legs_disclosed"]
+            .apply(lambda s: bool((~s.fillna(False)).any()))
+            .to_numpy()
+        )
+        monthly.loc[undisclosed, ["subscriptions", "redemptions"]] = float("nan")
+
     monthly["gross_return"] = grouped["gross_return"].apply(_compound).to_numpy()
+
+    # Compound total_return if available
+    if "total_return" in frame.columns:
+        monthly["total_return"] = grouped["total_return"].apply(_compound).to_numpy()
+
     monthly["reconcile_residual_vnd"] = monthly["nav_end"] - (
         monthly["nav_begin"]
         + monthly["chg_investment"].fillna(0.0)
@@ -371,7 +776,12 @@ def to_monthly(panel: pd.DataFrame) -> pd.DataFrame:
     )
     if "market_return" in frame.columns:
         monthly["market_return"] = grouped["market_return"].apply(_compound).to_numpy()
-        monthly["excess_return"] = monthly["gross_return"] - monthly["market_return"]
+        # Use total_return for excess if available, otherwise gross_return
+        if "total_return" in monthly.columns:
+            monthly["excess_return"] = monthly["total_return"] - monthly["market_return"]
+            monthly["excess_return_gross"] = monthly["gross_return"] - monthly["market_return"]
+        else:
+            monthly["excess_return"] = monthly["gross_return"] - monthly["market_return"]
     for column in ("deposit_rate_pct", "deposit_rate_provenance", "asset_class",
                    "fund_name", "manager_id"):
         if column in frame.columns:

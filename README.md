@@ -17,29 +17,31 @@ the name says so.
 
 The alternative approach, inferring flows from changes in units outstanding, is
 implemented only as a diagnostic and never as a panel value.
-Measured on this sample its error has a median of 0.62% and a 90th percentile of
-3.03%, and the error tracks the period return, which would bias exactly the
-flow-performance estimates such a panel is built to support.
+Measured on the current panel, the end-NAV unit-change proxy has a median
+absolute error of 0.42% of disclosed net flow and a 90th percentile of 2.98%.
+The midpoint-NAV proxy improves 2,972 of 3,973 comparable rows but still has a
+2.19% 90th-percentile error, so inferred unit changes are not substituted for
+the disclosed gross legs.
 See [METHOD.md](METHOD.md) section 2.1.
 
 ## Current coverage
 
 | | |
 |---|---|
-| Observations | 3,860 fund-periods |
-| Funds | 19, across 4 managers |
+| Observations | 3,989 fund-periods; 950 fund-months |
+| Funds | 18 economic funds, across 4 managers |
 | Span | 2021-01-04 to 2026-08-13 |
-| Frequency | weekly; 95.7% of rows span exactly 6 days |
-| Reconciliation residual | **0.00 VND on every row** |
-| Quarantined rows | 23, each with a written reason |
+| Frequency | weekly; 95.8% of rows span exactly 6 days |
+| Reconciliation residual | 3,988 rows close to 0.00 VND; one closes within its VND 784.63 scale-aware tolerance |
+| Quarantined rows | 20, each with a written reason |
 | Fmarket cross-check | 886 of 888 matched rows agree within 0.1% |
 
 | Manager | Funds | Rows | From |
 |---|---|---|---|
-| VinaCapital | VEOF, VESAF, VFF, VIBF, VLBF | 1,387 | 2021-01 |
-| DCVFM (Dragon Capital) | DCDS, DCDE, DCBF, DCIP, DCBC | 1,070 | 2021-06 |
+| VinaCapital | VEOF, VESAF, VFF, VIBF, VLBF | 1,381 | 2021-01 |
+| DCVFM (Dragon Capital) | DCDS, DCDE (including legacy DCBC), DCBF, DCIP | 1,069 | 2021-06 |
 | VCBF | BCF, MGF, TBF, FIF, AIF | 921 | 2022-07 |
-| SSIAM | SSI-SCA, SSIBF, SSI-EF, VLGF | 482 | 2021-07 |
+| SSIAM | SSI-SCA, SSIBF, SSI-EF, VLGF | 618 | 2021-05 |
 
 All four managers are `verified` in `sources.yaml`, meaning a filing has been
 fetched, parsed and added as a fixture. An unverified manager is excluded from
@@ -84,6 +86,10 @@ python -m vngross.run panel vcbf vinacapital ssiam dcvfm
 python -m vngross.run analysis
 ```
 
+```bash
+python -m vngross.run insights
+```
+
 Stages are independent and safe to re-run.
 `fetch` is content-addressed and skips anything already cached, so iterating on
 the parser never refetches.
@@ -108,6 +114,13 @@ Written to `data/output/`:
 | `fmarket_cross_check.csv` | every parsed NAV per unit against an independent source |
 | `parse_failures.csv` | every filing that could not be parsed, with the reason |
 | `analysis_paired_weekly.csv`, `analysis_paired_monthly.csv` | the paired net-versus-gross estimates |
+| `insights_leg_response.csv` | mean flow rate per leg by past-performance bin, with the top-minus-bottom spread |
+| `insights_retention.csv` | annualised attrition, holding half-life and organic growth, per fund |
+| `insights_seasonality.csv` | flow rate by calendar month, demeaned within fund |
+| `insights_macro_sensitivity.csv` | the deposit-rate coefficient against progressively harder controls |
+| `insights_forecast_backtest.csv` | out-of-sample flow forecast, market data against flow momentum |
+| `insights_flow_regime.csv` | net flow over the last ten months, per fund, as published |
+| `growth_research/` | acquisition, persistence, book-flow, investor net-unit-demand, macro, and Salesforce evidence tables plus a hash manifest |
 
 `data/deposit_rate_12m.csv` is a curated series, tracked in git, with
 per-observation provenance.
@@ -133,8 +146,9 @@ It is not scraped at run time.
 | `period_days` | period length; check before pooling, as frequency varies |
 | `date_conflict` | set when the filing's bilingual header disagrees with itself |
 | `template_variant` | `standard` or `alt`; see [METHOD.md](METHOD.md) section 4.6 |
-| `gross_legs_disclosed` | false where the manager files a net-only template |
-| `reconcile_residual_vnd` | identity residual; 0.00 throughout |
+| `gross_legs_disclosed` | true only when both gross source lines are present |
+| `gross_legs_inferred_zero` | gross source lines absent and disclosed net flow zero; never treated as disclosed gross data |
+| `reconcile_residual_vnd` | identity residual; required to stay within VND 5 or 1e-9 of closing NAV, whichever is larger |
 
 All flow rates are scaled by **beginning**-of-period NAV.
 Using closing or average NAV would put the flow inside its own denominator.
@@ -143,8 +157,17 @@ Using closing or average NAV would put the flow inside its own denominator.
 
 Two things need stating up front.
 
+**DCBC and DCDE are one economic fund.** DCBC was renamed DCDE in October
+2023. The final DCBC closing NAV exactly equals the first DCDE opening NAV, and
+`source_fund_key` preserves the legacy filename identity while `fund_code=DCDE`
+drives continuity, monthly aggregation, fixed effects, rolling returns, and
+forecasting.
+
 **Not every fund discloses the gross legs.**
-3,494 of 3,860 rows do. SSIAM's SSIBF and SSI-EF, and VinaCapital's VLBF under
+`gross_legs_disclosed` is true only when both source lines are present. A
+net-only zero is separately flagged as `gross_legs_inferred_zero`; it is not
+silently promoted to disclosed gross data.
+3,490 of 3,989 rows do. SSIAM's SSIBF and SSI-EF, and VinaCapital's VLBF under
 its older template, file a reduced Appendix XXIV carrying only the combined net
 line. Check `gross_legs_disclosed` before using `gross_subscription_rate` or
 `gross_redemption_rate`; where it is false those columns are missing rather than
@@ -156,28 +179,49 @@ the same level, and 4 are left missing (2025-11 to 2026-02).
 There is no carry-forward: a month is filled only when bracketed on both sides by
 the same measured level, because an audit found that one-sided carry produced a
 wrong value in 10 of 18 cases.
-It covers 77% of panel rows.
+The 46 non-missing months cover about 76% of period rows.
 The column mixes several constructs - a single bank's board rate, a state-owned
 average, a big-four mean, and a market-wide average - so check
 `deposit_rate_source` before treating it as one series.
-21 of the 23 observations are Agribank alone, because it is the only big-four
-bank whose historical table is recoverable; the others render client-side and
-were never captured.
-The remaining 2 are true four-bank means recovered from CafeF's underlying JSON,
-and they anchor the 2026 tail.
+Twenty-one of the 36 directly observed months are Agribank alone, because it is
+the only big-four bank whose historical table is recoverable; the other banks'
+older tables render client-side and were not captured consistently.
+The remaining observations use VNDIRECT, Shinhan, press, or CafeF sources. The
+two CafeF months are true four-bank means and anchor the 2026 tail.
 Check `deposit_rate_source` before treating the column as a market average.
 [METHOD.md](METHOD.md) section 6 has the full account.
 
 **Continuity breaks are reported, not quarantined.**
-There are 101 across 19 funds, each recording an opening NAV that does not match
-the prior closing NAV.
-Every one traces to a filing the manager never published, published broken, or
-that the panel quarantined; none is an unexplained crawler hole.
+There are 79 continuity records across 18 economic funds in the current build.
+They include known publication gaps and rows deliberately excluded by the
+stronger validation gates; consult `continuity_breaks.csv` rather than assuming
+all are crawler failures.
 Rows either side of a gap are individually valid and reconcile exactly, so they
 stay in the panel.
 Anyone computing a multi-period quantity should consult
 `continuity_breaks.csv` first, because a gap that goes unnoticed turns an
 unobserved period into a fabricated flow.
+
+**The defensible performance claim is narrower than a pooled fund-industry
+claim.** In equity and balanced funds, sustained relative performance over
+roughly 3–12 months is associated with higher subscriptions, but not lower
+redemptions. The one-month response is not robust. Bond results are exploratory:
+only a small comparable set discloses both gross legs, DCIP is structurally
+different, and VN-Index is not a bond benchmark.
+
+Forecast outputs use only information dated t-1 or earlier and compare against
+historical-mean, last-flow, trailing-mean, seasonal, performance-only,
+lagged-market, and lagged-macro baselines. The evaluation window is too short for
+a general claim that market data cannot forecast fund flows.
+
+`insights` also excludes high-turnover vehicles from every estimate, detected by
+behaviour rather than named: a fund whose median month subscribes more than 20%
+of its own NAV is a place to park cash, not a fund gathering assets. Today that
+catches DCIP alone, which is 67% of all bond gross subscriptions against 15% of
+bond NAV. Including it, the deposit-rate effect on bond redemptions carries
+t = -4.7; excluding it, the effect vanishes at t = +0.3. `insights_flow_regime.csv`
+is the one reading that keeps such vehicles, because it reports rather than
+estimates.
 
 The survivorship, distribution-adjustment and single-manager limitations are in
 [METHOD.md](METHOD.md) section 7.
@@ -193,6 +237,7 @@ vngross/
   macro.py           VN-Index, deposit rate, Fmarket cross-check
   panel.py           dedupe, quarantine, flow measures, joins, monthly rollup
   analysis.py        paired net-versus-gross specifications, cluster-robust OLS
+  insights.py        manager-facing readings: leg response, retention, seasonality
   run.py             stage driver
   sources.yaml       manager and fund registry
 fixtures/            real filings, one per format variant that broke an assumption
