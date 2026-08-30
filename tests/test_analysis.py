@@ -149,7 +149,8 @@ def _panel(n_funds: int = 6, n_periods: int = 60, seed: int = 3) -> pd.DataFrame
 def test_lagged_performance_never_uses_the_current_period() -> None:
     frame = _panel(n_funds=2, n_periods=10)
     one = frame[frame.fund_code == "F0"].sort_values("period_end")
-    # The 1-period window at row i must equal the return at row i-1.
+    # The 1-period window at row i must equal the compounded return at row i-1.
+    # Since window=1, compounding is just (1+r)-1 = r
     assert one["ret_lag1_1"].iloc[3] == pytest.approx(one["gross_return"].iloc[2])
     assert pd.isna(one["ret_lag1_1"].iloc[0])
 
@@ -157,7 +158,8 @@ def test_lagged_performance_never_uses_the_current_period() -> None:
 def test_lagged_window_sums_the_right_number_of_periods() -> None:
     frame = _panel(n_funds=1, n_periods=12)
     one = frame.sort_values("period_end")
-    expected = one["gross_return"].iloc[1:5].sum()
+    # Compounded returns: (1+r1)*(1+r2)*...*(1+r4) - 1
+    expected = np.prod(1.0 + one["gross_return"].iloc[1:5].values) - 1.0
     assert one["ret_lag1_4"].iloc[5] == pytest.approx(expected)
 
 

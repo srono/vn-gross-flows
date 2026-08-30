@@ -1,0 +1,8 @@
+check_category,n_periods,share_of_invalid,example_reason
+non_contiguous_filing_pair,75,0.635593220338983,non-contiguous filing pair: 8-day boundary gap
+critical_fields_missing,29,0.2457627118644068,"critical fields missing: nav_per_unit_begin, nav_per_unit_end, units_end, foreign_units"
+stock_history_missing,6,0.05084745762711865,"previous stock missing: units_end, foreign_units, nav_per_unit_end"
+foreign_units_exceed_total_units,2,0.01694915254237288,current foreign_units 6.00052e+08 exceed total units 3.54696e+06 (including 0.1% tolerance)
+foreign_value_identity,2,0.01694915254237288,"current foreign_value identity gap 2,725,577,931 VND exceeds 0.1% of total NAV (1,351,906,290 VND)"
+prior_foreign_units_mismatch,2,0.01694915254237288,same-filing prior foreign units disagree with previous filing by 13200000.0000%
+unit_flow_proxy_error,2,0.01694915254237288,unit-change/net-flow proxy error is 1.478% of opening NAV

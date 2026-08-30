@@ -115,9 +115,21 @@ CHANGE_FIELDS: frozenset[str] = frozenset(
     }
 )
 
-_CODE_RE = re.compile(r"^[0-9]+(?:\.[0-9]+){0,2}$")
-_NUMERIC_TOKEN_RE = re.compile(r"^\(?-?[0-9][0-9,]*(?:\.[0-9]+)?\)?%?$")
-_ROW_RE = re.compile(r"^\s*([0-9]+(?:\.[0-9]+){0,2})\s+(\S.*?)\s*$")
+# Line codes are dotted in most filings and comma-separated in SSIAM's November
+# 2025 template, which prints "1,1", "2,1", "3,1" for the same rows every other
+# filing codes "1.1", "2.1", "3.1". Both are accepted and normalised to dots.
+# Components are one or two digits: the template's deepest code is "3.2.1" and
+# no part ever reaches three. Bounding the length is what keeps a code apart
+# from a thousands-grouped figure now that the comma form is accepted, because
+# "209,172,172" is otherwise indistinguishable from a three-part code and was
+# briefly read as one, stealing line 3.1's value from its own row.
+_CODE_RE = re.compile(r"^[0-9]{1,2}(?:[.,][0-9]{1,2}){0,2}$")
+# A numeric token may group thousands with either separator, so more than one
+# dot is legitimate: "6.487.457.656" is six and a half billion in the same
+# filing that writes NAV as "103,228,319,952". Grouping is validated when the
+# token is parsed, not here; this pattern only decides what looks like a figure.
+_NUMERIC_TOKEN_RE = re.compile(r"^\(?-?[0-9][0-9,]*(?:\.[0-9]+)*\)?%?$")
+_ROW_RE = re.compile(r"^\s*([0-9]+(?:[.,][0-9]+){0,2})\s+(\S.*?)\s*$")
 
 # Header-block lines that open with a bare digit which collides with a real line
 # code: "4 Ky bao cao: ..." would otherwise be read as line 4 because it ends in
@@ -181,12 +193,88 @@ class ParseError(ValueError):
     """The document is not a parseable Appendix XXIV filing."""
 
 
-def parse_number(tok: str) -> float:
+def _grouped_by(separator: str, body: str) -> bool:
+    """Is `body` a plausible thousands-grouped integer under `separator`?"""
+    head, *rest = body.split(separator)
+    return (
+        1 <= len(head) <= 3
+        and head.isdigit()
+        and bool(rest)
+        and all(len(group) == 3 and group.isdigit() for group in rest)
+    )
+
+
+def _resolve_separators(body: str, convention: str | None, tok: str) -> str:
+    """Rewrite a digit-and-separator string into plain float syntax.
+
+    Two conventions appear in this corpus and a single filing can use both. The
+    November 2025 SSIBF template prints NAV as "103,228,319,952" and, on the
+    same page, the change in NAV as "(6.487.457.656)". Both readings check out
+    against the NAV identity, so a container cannot pick one rule and apply it
+    page-wide.
+
+    Almost every token settles itself. When both separators appear, the one
+    further right is the decimal, because no convention puts a thousands group
+    after the decimal. A separator appearing more than once is grouping
+    thousands. A separator appearing once with one, two, or four-plus digits
+    behind it is a decimal, because thousands groups are exactly three digits.
+
+    That leaves exactly one ambiguous shape: a single separator with exactly
+    three digits behind it. "10.029" is ten-point-oh-two-nine to an English
+    reader and ten thousand and twenty-nine to a Vietnamese one, and nothing
+    inside the token decides it. `convention` resolves those and only those. An
+    unambiguous token is always read as written, even where that contradicts the
+    convention passed in, because the token is evidence and the convention is an
+    inference. With no convention supplied an ambiguous token raises rather than
+    guessing, because guessing here is a silent factor of 1,000.
+    """
+    commas, dots = body.count(","), body.count(".")
+
+    if commas and dots:
+        decimal = "," if body.rfind(",") > body.rfind(".") else "."
+        thousands = "." if decimal == "," else ","
+        whole, frac = body.rsplit(decimal, 1)
+        if not _grouped_by(thousands, whole):
+            raise ParseError(f"inconsistent thousands grouping in {tok!r}")
+        return whole.replace(thousands, "") + "." + frac
+
+    for separator in (",", "."):
+        count = commas if separator == "," else dots
+        if not count:
+            continue
+        if count > 1:
+            if not _grouped_by(separator, body):
+                raise ParseError(f"inconsistent thousands grouping in {tok!r}")
+            return body.replace(separator, "")
+        if len(body.rsplit(separator, 1)[1]) != 3:
+            return body.replace(separator, ".")
+        # Single separator, exactly three digits behind it: undecidable alone.
+        if convention is None:
+            raise ParseError(
+                f"ambiguous number {tok!r}: {separator!r} could group thousands "
+                "or mark a decimal, and the document declares neither"
+            )
+        thousands_sep = "," if convention == "en" else "."
+        return (
+            body.replace(separator, "")
+            if separator == thousands_sep
+            else body.replace(separator, ".")
+        )
+
+    return body
+
+
+def parse_number(tok: str, convention: str | None = None) -> float:
     """Parse one template cell into a float.
 
-    Handles comma thousands separators, accounting parentheses for negatives,
+    Handles both thousands conventions, accounting parentheses for negatives,
     and a trailing percent sign. Raises ParseError on anything else, including
     the empty string, so a blank cell never silently becomes a number.
+
+    `convention` is "en", "vi", or None, and is consulted only for the single
+    token shape that cannot resolve itself. Containers pass whatever
+    `detect_convention` read off the document; None means undeclared, and
+    undeclared plus ambiguous is an error rather than a guess.
     """
     if tok is None:
         raise ParseError("cannot parse number from None")
@@ -205,9 +293,13 @@ def parse_number(tok: str) -> float:
     if negative:
         s = s.lstrip("(").rstrip(")").strip()
 
-    s = s.replace(",", "").replace(" ", "")
-    if not s:
-        raise ParseError("cannot parse number from empty cell")
+    s = s.replace(" ", "")
+    if s.startswith("-"):
+        negative, s = True, s[1:]
+    if not s or not set(s) <= set("0123456789,.") or not any(c.isdigit() for c in s):
+        raise ParseError(f"cannot parse number from {tok!r}")
+
+    s = _resolve_separators(s, convention, tok)
 
     try:
         value = float(s)
@@ -215,6 +307,35 @@ def parse_number(tok: str) -> float:
         raise ParseError(f"cannot parse number from {tok!r}") from exc
 
     return -value if negative else value
+
+
+# A token declares its own convention when it carries both separators, repeats
+# one of them, or puts a non-three-digit tail behind one. These patterns match
+# only such self-evident tokens; every other shape abstains.
+_EN_EVIDENCE = re.compile(
+    r"(?<![\d.,])(?:\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+\.\d{1,2}|\d+\.\d{4,})(?![\d.,])"
+)
+_VI_EVIDENCE = re.compile(
+    r"(?<![\d.,])(?:\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+,\d{1,2}|\d+,\d{4,})(?![\d.,])"
+)
+
+
+def detect_convention(text: str) -> str | None:
+    """Read a document's thousands convention off its own unambiguous tokens.
+
+    Returns "en", "vi", or None. None means the document showed no self-evident
+    token, or showed both, and either way its ambiguous tokens must raise rather
+    than be settled by majority vote. Mixed is a real state in this corpus, not
+    a defect in this function: the November 2025 SSIBF template prints NAV in
+    one convention and the change in NAV in the other.
+    """
+    english = len(_EN_EVIDENCE.findall(text or ""))
+    vietnamese = len(_VI_EVIDENCE.findall(text or ""))
+    if english and not vietnamese:
+        return "en"
+    if vietnamese and not english:
+        return "vi"
+    return None
 
 
 def _parse_date(s: str) -> date:
@@ -245,6 +366,10 @@ def _normalise_code(raw) -> str | None:
         text = f"{raw:.10f}".rstrip("0").rstrip(".")
         return text or None
     text = str(raw).strip()
+    # SSIAM's November 2025 template codes rows "1,1" where every other filing
+    # writes "1.1". Normalise so FIELD_MAP and SECTION_CODES stay dotted.
+    if _CODE_RE.match(text):
+        text = text.replace(",", ".")
     return text or None
 
 
@@ -259,6 +384,8 @@ class Filing:
     values: dict[str, float] = field(default_factory=dict)
     prior_values: dict[str, float] = field(default_factory=dict)
     source: str | None = None
+    # Registry/filename identity before canonical economic-code normalization.
+    source_fund_key: str | None = None
     # Set when the bilingual header's two halves disagree on the period window.
     # Carried into the panel rather than resolved silently.
     date_conflict: str | None = None
@@ -307,6 +434,43 @@ class Filing:
         return end / begin - 1.0
 
     @property
+    def price_return(self) -> float | None:
+        """NAV-price return, excluding cash distributed to certificate holders."""
+        return self.gross_return
+
+    @property
+    def distribution_yield(self) -> float | None:
+        """Distribution yield as fraction of beginning NAV per unit."""
+        begin = self.values.get("nav_per_unit_begin")
+        dist = self.values.get("chg_distribution")
+        units_begin = self.units_begin
+
+        if begin in (None, 0.0) or dist is None or units_begin in (None, 0.0):
+            return None
+
+        # Line 3.3 is a negative NAV change when cash leaves the fund. Convert it
+        # to the positive cash received per beginning certificate.
+        distribution_per_unit = -dist / units_begin
+        return distribution_per_unit / begin
+
+    @property
+    def total_return(self) -> float | None:
+        """Total return with cash distributions reinvested at period-end NAV.
+
+        Printed line 3.3 is converted to cash per beginning certificate. The
+        standard ex-distribution approximation is price return plus that yield;
+        unlike adding ``abs(chg_distribution) / nav_begin`` blindly, this makes
+        the unit basis explicit and remains valid when units change in-period.
+        """
+        price_ret = self.price_return
+        dist_yield = self.distribution_yield
+
+        if price_ret is None:
+            return None
+
+        return price_ret + (dist_yield or 0.0)
+
+    @property
     def period_days(self) -> int | None:
         if self.period_start is None or self.period_end is None:
             return None
@@ -325,6 +489,37 @@ class Filing:
             return None
         return value / nav_end * 100.0
 
+    @property
+    def foreign_ownership_anomaly(self) -> str | None:
+        """Detect foreign ownership reporting anomalies.
+
+        Returns a description if the identity nav_foreign = units_foreign * nav_per_unit
+        or the disclosed ownership % disagrees with the calculated share.
+        """
+        units = self.values.get("foreign_units")
+        value = self.values.get("foreign_value")
+        pct = self.values.get("foreign_ownership_pct")
+        nav_pu_end = self.values.get("nav_per_unit_end")
+
+        issues = []
+
+        # Check foreign value identity: foreign_value = foreign_units * nav_per_unit
+        if units is not None and nav_pu_end is not None and value is not None:
+            implied_value = units * nav_pu_end
+            residual = value - implied_value
+            if abs(residual) > max(5.0, 1e-9 * abs(value)):
+                issues.append(f"foreign_value identity: {residual:,.0f} VND gap")
+
+        # Check ownership percentage consistency
+        if pct is not None:
+            calculated = self.foreign_share_of_nav
+            if calculated is not None:
+                pct_gap = abs(pct - calculated)
+                if pct_gap > 0.1:  # More than 0.1 percentage points
+                    issues.append(f"ownership %: reported {pct:.2f}% vs calculated {calculated:.2f}%")
+
+        return "; ".join(issues) if issues else None
+
     def as_row(self) -> dict:
         """Flatten to one panel row. Prior-period columns get a `prior_` prefix."""
         row: dict = {
@@ -334,6 +529,7 @@ class Filing:
             "report_date": self.report_date,
             "period_days": self.period_days,
             "source": self.source,
+            "source_fund_key": self.source_fund_key,
             "date_conflict": self.date_conflict,
             "template_variant": self.template_variant,
         }
@@ -348,7 +544,11 @@ class Filing:
         row["units_begin"] = self.units_begin
         row["units_end"] = self.units_end
         row["gross_return"] = self.gross_return
+        row["price_return"] = self.price_return
+        row["distribution_yield"] = self.distribution_yield
+        row["total_return"] = self.total_return
         row["foreign_share_of_nav"] = self.foreign_share_of_nav
+        row["foreign_ownership_anomaly"] = self.foreign_ownership_anomaly
         return row
 
 
@@ -571,13 +771,14 @@ def parse_text(
     if not text or not text.strip():
         raise ParseError("empty text")
 
+    convention = detect_convention(text)
     cells: Cells = {}
     for raw_line in text.splitlines():
         line = raw_line.replace(" ", " ").rstrip()
         match = _ROW_RE.match(line)
         if not match:
             continue
-        code, remainder = match.group(1), match.group(2)
+        code, remainder = match.group(1).replace(",", "."), match.group(2)
         if code in SECTION_CODES or code in cells:
             continue
         if _METADATA_LINE_RE.search(remainder):
@@ -593,8 +794,10 @@ def parse_text(
             continue
         trailing.reverse()
 
-        this_period = parse_number(trailing[0])
-        last_period = parse_number(trailing[1]) if len(trailing) > 1 else None
+        this_period = parse_number(trailing[0], convention)
+        last_period = (
+            parse_number(trailing[1], convention) if len(trailing) > 1 else None
+        )
         cells[code] = (this_period, last_period)
 
     period_start, period_end, report_date, date_conflict = _dates_from_text(text)
@@ -662,7 +865,7 @@ _NUMERIC_GLYPHS = set("0123456789,.()%-")
 
 
 def _recover_from_chars(
-    chars: list[dict], window: tuple[float, float]
+    chars: list[dict], window: tuple[float, float], convention: str | None = None
 ) -> float | None:
     """Rebuild a value from raw glyphs when word grouping mangled it.
 
@@ -689,7 +892,7 @@ def _recover_from_chars(
     if not any(ch.isdigit() for ch in text):
         return None
     try:
-        return parse_number(text)
+        return parse_number(text, convention)
     except ParseError:
         return None
 
@@ -718,6 +921,10 @@ def _cells_from_pdf(path: str | Path) -> tuple[Cells, str]:
                 word["_page"] = page_no
                 rows.setdefault(key, []).append(word)
 
+    # Read the convention off the page text before any cell is parsed, so that
+    # every token in this document is resolved against the same evidence.
+    convention = detect_convention("\n".join(text_parts))
+
     # Merge buckets that belong to the same visual row.
     merged: dict[tuple[int, int], list[dict]] = {}
     for (page_no, band), words in sorted(rows.items()):
@@ -740,10 +947,18 @@ def _cells_from_pdf(path: str | Path) -> tuple[Cells, str]:
             continue
         body.append(ordered)
 
-    numeric_words = [
-        w for ordered in body for w in ordered[1:] if _NUMERIC_TOKEN_RE.match(w["text"])
-    ]
-    edges = _column_right_edges(numeric_words)
+    # Column geometry is a property of a page, not of a document. SSIAM files
+    # the same report five pages long, and page 3 carries a second copy of the
+    # table whose value columns sit at different x-positions than page 0's.
+    # Pooling every page's numeric words into one pair of edges once produced an
+    # anchor pair straddling two different tables, taking the left column from
+    # page 3 and the right column from page 0, so no row satisfied both and the
+    # filing was reported as "line 2.1 absent". Measure each page on its own.
+    by_page: dict[int, list[dict]] = {}
+    for ordered in body:
+        for word in ordered[1:]:
+            if _NUMERIC_TOKEN_RE.match(word["text"]):
+                by_page.setdefault(word.get("_page", 0), []).append(word)
 
     # Per-column x-window, anchored on the column's right edge and made as wide
     # as the widest figure that column actually holds. Anchoring on the right is
@@ -751,29 +966,38 @@ def _cells_from_pdf(path: str | Path) -> tuple[Cells, str]:
     # window sized to the widest observed number cannot reach into the column
     # to its left, while still being wide enough to catch a leading digit that
     # word grouping split off.
-    widths: dict[int, float] = {}
-    for word in numeric_words:
-        if len(edges) < 2:
-            break
-        index = min(range(len(edges)), key=lambda i: abs(word["x1"] - edges[i]))
-        if abs(word["x1"] - edges[index]) > _COLUMN_TOLERANCE_PT:
-            continue
-        widths[index] = max(widths.get(index, 0.0), word["x1"] - word["x0"])
-
-    windows: dict[int, tuple[float, float]] = {}
-    for index, edge in enumerate(edges):
-        width = widths.get(index)
-        if width is None:
-            continue
-        left = edge - width - _COLUMN_TOLERANCE_PT
-        if index > 0:
-            # Never reach past the previous column's right edge.
-            left = max(left, edges[index - 1] + 2.0)
-        windows[index] = (left, edge + 3.0)
+    page_edges: dict[int, list[float]] = {}
+    page_windows: dict[int, dict[int, tuple[float, float]]] = {}
+    for page_no, words in by_page.items():
+        edges_here = _column_right_edges(words)
+        page_edges[page_no] = edges_here
+        widths: dict[int, float] = {}
+        if len(edges_here) >= 2:
+            for word in words:
+                index = min(
+                    range(len(edges_here)),
+                    key=lambda i: abs(word["x1"] - edges_here[i]),
+                )
+                if abs(word["x1"] - edges_here[index]) > _COLUMN_TOLERANCE_PT:
+                    continue
+                widths[index] = max(widths.get(index, 0.0), word["x1"] - word["x0"])
+        windows_here: dict[int, tuple[float, float]] = {}
+        for index, edge in enumerate(edges_here):
+            width = widths.get(index)
+            if width is None:
+                continue
+            left = edge - width - _COLUMN_TOLERANCE_PT
+            if index > 0:
+                # Never reach past the previous column's right edge.
+                left = max(left, edges_here[index - 1] + 2.0)
+            windows_here[index] = (left, edge + 3.0)
+        page_windows[page_no] = windows_here
 
     cells: Cells = {}
     for ordered in body:
         code = ordered[0]["text"].strip()
+        if _CODE_RE.match(code):
+            code = code.replace(",", ".")
         if not _CODE_RE.match(code) or code in SECTION_CODES or code in cells:
             continue
 
@@ -781,10 +1005,18 @@ def _cells_from_pdf(path: str | Path) -> tuple[Cells, str]:
         if not numbers:
             continue
 
+        page_no = ordered[0].get("_page", 0)
+        edges = page_edges.get(page_no, [])
+        windows = page_windows.get(page_no, {})
+
         if len(edges) < 2:
             # Single-column layout: everything is this-period, in reading order.
-            this_period = parse_number(numbers[0]["text"])
-            last_period = parse_number(numbers[1]["text"]) if len(numbers) > 1 else None
+            this_period = parse_number(numbers[0]["text"], convention)
+            last_period = (
+                parse_number(numbers[1]["text"], convention)
+                if len(numbers) > 1
+                else None
+            )
         else:
             # Read the glyphs, not pdfplumber's grouping of them. Word grouping
             # is a heuristic over these same characters and it fails two ways in
@@ -793,7 +1025,6 @@ def _cells_from_pdf(path: str | Path) -> tuple[Cells, str]:
             # 828,087,665 to 28,087,665. Reading every numeric glyph inside the
             # column window in x-order is immune to both, and the reconciliation
             # identity independently checks the result on every row.
-            page_no = ordered[0].get("_page", 0)
             tops = [w["top"] for w in ordered]
             band = [
                 c
@@ -801,10 +1032,14 @@ def _cells_from_pdf(path: str | Path) -> tuple[Cells, str]:
                 if min(tops) - 1.5 <= c["top"] <= max(tops) + 1.5
             ]
             this_period = (
-                _recover_from_chars(band, windows[0]) if 0 in windows else None
+                _recover_from_chars(band, windows[0], convention)
+                if 0 in windows
+                else None
             )
             last_period = (
-                _recover_from_chars(band, windows[1]) if 1 in windows else None
+                _recover_from_chars(band, windows[1], convention)
+                if 1 in windows
+                else None
             )
 
             # Word grouping remains the fallback for anything the glyph pass
@@ -817,7 +1052,7 @@ def _cells_from_pdf(path: str | Path) -> tuple[Cells, str]:
                     )
                     if abs(word["x1"] - edges[index]) > _COLUMN_TOLERANCE_PT:
                         continue  # a number inside label text, not a value cell
-                    slot.setdefault(index, parse_number(word["text"]))
+                    slot.setdefault(index, parse_number(word["text"], convention))
                 if this_period is None:
                     this_period = slot.get(0)
                 if last_period is None:
@@ -837,7 +1072,7 @@ def _cells_from_pdf(path: str | Path) -> tuple[Cells, str]:
     # That is the document's own visual grammar rather than a guess, and it only
     # ever fills a slot the first pass left empty, so it cannot overwrite a value
     # that was read correctly.
-    if len(edges) >= 2:
+    if any(len(e) >= 2 for e in page_edges.values()):
         code_lines: list[tuple[int, float, str]] = []
         numeric_lines: list[tuple[int, float, list[dict]]] = []
         for ordered in body:
@@ -855,7 +1090,9 @@ def _cells_from_pdf(path: str | Path) -> tuple[Cells, str]:
                 w
                 for w in ordered
                 if _NUMERIC_TOKEN_RE.match(w["text"])
-                and min(abs(w["x1"] - e) for e in edges) <= _COLUMN_TOLERANCE_PT
+                and page_edges.get(page_no)
+                and min(abs(w["x1"] - e) for e in page_edges[page_no])
+                <= _COLUMN_TOLERANCE_PT
             ]
             if values:
                 numeric_lines.append((page_no, top, values))
@@ -874,12 +1111,17 @@ def _cells_from_pdf(path: str | Path) -> tuple[Cells, str]:
             existing = cells.get(code, (None, None))
             if existing[0] is not None and existing[1] is not None:
                 continue
+            edges_here = page_edges.get(page_no, [])
+            if len(edges_here) < 2:
+                continue
             slot: dict[int, float] = {}
             for word in words:
-                index = min(range(len(edges)), key=lambda i: abs(word["x1"] - edges[i]))
-                if abs(word["x1"] - edges[index]) > _COLUMN_TOLERANCE_PT:
+                index = min(
+                    range(len(edges_here)), key=lambda i: abs(word["x1"] - edges_here[i])
+                )
+                if abs(word["x1"] - edges_here[index]) > _COLUMN_TOLERANCE_PT:
                     continue
-                slot.setdefault(index, parse_number(word["text"]))
+                slot.setdefault(index, parse_number(word["text"], convention))
             merged = (
                 existing[0] if existing[0] is not None else slot.get(0),
                 existing[1] if existing[1] is not None else slot.get(1),

@@ -1,0 +1,31 @@
+group,driver,driver_label,controls,coef,std_err,t,n_obs,n_clusters,within_r2
+bond,deposit_rate_pct,"Vietnam 12m deposit rate, level (pp)",none,0.006229561149921437,0.006936918130070029,0.8980300809544871,148,46,0.014019016165577547
+bond,deposit_rate_pct,"Vietnam 12m deposit rate, level (pp)",ret_lag1_6,0.00719429802555322,0.007830113371354898,0.9187987049935066,136,46,0.018213950118689537
+bond,deposit_rate_pct,"Vietnam 12m deposit rate, level (pp)","ret_lag1_6, market_return",0.005578839238011727,0.008085306999400035,0.6899972058483,136,46,0.057545222111966554
+bond,deposit_rate_pct,"Vietnam 12m deposit rate, level (pp)","ret_lag1_6, market_return, time_trend",0.013639920173515065,0.00785689979223663,1.7360435456988537,136,46,0.14295350860416378
+bond,deposit_rate_pct,"Vietnam 12m deposit rate, level (pp)","ret_lag1_6, market_return, time_trend, log_nav_begin",0.02266252634664996,0.008630862579571592,2.625754510364925,136,46,0.24453951328251067
+bond,gold_return,"World gold, monthly log return",none,0.08748158569495554,0.0760098802670287,1.150923871839106,169,59,0.008589534607997273
+bond,gold_return,"World gold, monthly log return",ret_lag1_6,0.046024507475522954,0.07902262287193293,0.5824219166973491,147,53,0.0023865021259392716
+bond,gold_return,"World gold, monthly log return","ret_lag1_6, market_return",0.05088481631647542,0.0786450104864098,0.6470190035166762,147,53,0.009908508852306874
+bond,gold_return,"World gold, monthly log return","ret_lag1_6, market_return, time_trend",0.040788608210441175,0.07809230847028886,0.5223127476883294,147,53,0.014683873290758265
+bond,gold_return,"World gold, monthly log return","ret_lag1_6, market_return, time_trend, log_nav_begin",0.023220915011233547,0.07049144106856982,0.3294146730330799,147,53,0.07447170953316151
+bond,usdvnd_return,"USD/VND, monthly log return",none,-0.7970918880565402,0.44996547975352275,-1.7714511977522422,179,63,0.049291941607115475
+bond,usdvnd_return,"USD/VND, monthly log return",ret_lag1_6,-0.9663752401207352,0.6007471772149817,-1.6086221904541897,157,57,0.06402352715419801
+bond,usdvnd_return,"USD/VND, monthly log return","ret_lag1_6, market_return",-1.0149931144680882,0.5979013153368036,-1.6975930449263734,157,57,0.0882215659919382
+bond,usdvnd_return,"USD/VND, monthly log return","ret_lag1_6, market_return, time_trend",-0.9775935985832277,0.6389239217643137,-1.5300626025767157,157,57,0.10729036701564376
+bond,usdvnd_return,"USD/VND, monthly log return","ret_lag1_6, market_return, time_trend, log_nav_begin",-0.9658609552799298,0.6375957279798258,-1.514848536297738,157,57,0.14674065244135903
+equity_balanced,deposit_rate_pct,"Vietnam 12m deposit rate, level (pp)",none,-0.007496584096464098,0.00205791745802887,-3.6428011566822183,435,46,0.06731555081909835
+equity_balanced,deposit_rate_pct,"Vietnam 12m deposit rate, level (pp)",ret_lag1_6,-0.006525590172500738,0.0024703316149409017,-2.641584689696347,417,46,0.07180034488191422
+equity_balanced,deposit_rate_pct,"Vietnam 12m deposit rate, level (pp)","ret_lag1_6, market_return",-0.006349333325008812,0.0024279853933560397,-2.615062406216768,417,46,0.07651752313356641
+equity_balanced,deposit_rate_pct,"Vietnam 12m deposit rate, level (pp)","ret_lag1_6, market_return, time_trend",-0.006484505464493025,0.0024374177741171956,-2.6603996792636986,417,46,0.07656461671976056
+equity_balanced,deposit_rate_pct,"Vietnam 12m deposit rate, level (pp)","ret_lag1_6, market_return, time_trend, log_nav_begin",-0.006350374256908712,0.002480774639338526,-2.5598352047818325,417,46,0.08812182019305703
+equity_balanced,gold_return,"World gold, monthly log return",none,-0.015237816965948517,0.06214348136602394,-0.24520378696195116,487,59,0.00023741057548443134
+equity_balanced,gold_return,"World gold, monthly log return",ret_lag1_6,0.02590210924914834,0.04506059555788057,0.5748283822808543,431,53,0.05808983872596318
+equity_balanced,gold_return,"World gold, monthly log return","ret_lag1_6, market_return",0.019895498319775516,0.0447910636088217,0.4441845474698005,431,53,0.07309599399482791
+equity_balanced,gold_return,"World gold, monthly log return","ret_lag1_6, market_return, time_trend",0.026774542501197006,0.04304407097791606,0.6220262603631008,431,53,0.07667261664763392
+equity_balanced,gold_return,"World gold, monthly log return","ret_lag1_6, market_return, time_trend, log_nav_begin",0.028542276462120108,0.04343963552172895,0.6570560760769498,431,53,0.0773617656384693
+equity_balanced,usdvnd_return,"USD/VND, monthly log return",none,0.08498822482841968,0.14503580947095657,0.5859809735156377,521,63,0.000619428360225549
+equity_balanced,usdvnd_return,"USD/VND, monthly log return",ret_lag1_6,0.13483467639857347,0.09175384919857602,1.4695261024609532,467,57,0.0514682539703879
+equity_balanced,usdvnd_return,"USD/VND, monthly log return","ret_lag1_6, market_return",0.15217943805218676,0.1001239167418141,1.519910956386238,467,57,0.06223425897260326
+equity_balanced,usdvnd_return,"USD/VND, monthly log return","ret_lag1_6, market_return, time_trend",0.15353359694164986,0.10098100588423219,1.5204205543136065,467,57,0.062382206288216
+equity_balanced,usdvnd_return,"USD/VND, monthly log return","ret_lag1_6, market_return, time_trend, log_nav_begin",0.14884990038600746,0.09953644588410306,1.4954311364434627,467,57,0.06350430939828022

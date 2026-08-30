@@ -1,0 +1,7 @@
+series,label,source,url,transform,published_raw_observations,analysis_column,cache_sha256
+deposit_rate_pct,Vietnam 12-month deposit rate (1 percentage point),curated multi-source series; row-level provenance in data/deposit_rate_12m.csv,data/deposit_rate_12m.csv,monthly level and first difference,True,,
+VIXCLS,CBOE VIX (10 index points),CBOE via FRED,https://fred.stlouisfed.org/series/VIXCLS,mean,False,vix_mean,c58e6fd43b98722aa479a95948c8728e52e6396cf17e7bdee1931cf9ded2bc52
+SP500,S&P 500 monthly return (10 percentage points),S&P Dow Jones Indices via FRED,https://fred.stlouisfed.org/series/SP500,return,False,sp500_return,460eb58ca9f9a16b22fdb5eab04c86cbcbd6b301c16cef8343d922b34ab187f3
+DTWEXBGS,Broad U.S. dollar index return (1 percentage point),Federal Reserve Board via FRED,https://fred.stlouisfed.org/series/DTWEXBGS,return,False,broad_dollar_return,2e336f374290a54dfdbc22697361ab50694e750bf7ed3d820e6be68e73b21fd5
+DGS10,U.S. 10-year Treasury yield (1 percentage point),Federal Reserve Board via FRED,https://fred.stlouisfed.org/series/DGS10,last,False,us10y_pct,ebeba045cdce9b96153f6ad4e9ae665abddead007a07ad53f1e7b4024d14123d
+FEDFUNDS,Effective federal funds rate (1 percentage point),Federal Reserve Board via FRED,https://fred.stlouisfed.org/series/FEDFUNDS,last,False,fed_funds_pct,48a03726f49a703eeb2fea837ab8015b3f4a43fd17a50f116bee6c1cde143598

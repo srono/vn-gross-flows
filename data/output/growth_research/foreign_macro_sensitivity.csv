@@ -1,0 +1,33 @@
+sample,dependent,driver,posterior_inclusion_probability,n_fund_months,n_months_effective,n_funds,best_model_terms
+all funds,foreign_demand_rate,us10y_pct,0.24002722227870293,535,42,18,
+all funds,foreign_demand_rate,fed_funds_pct,0.2584017255077464,535,42,18,
+all funds,foreign_demand_rate,vix,0.1803614508712428,535,42,18,
+all funds,foreign_demand_rate,sp500_return,0.23005712577271914,535,42,18,
+all funds,foreign_demand_rate,broad_dollar_return,0.17606691781715392,535,42,18,
+all funds,foreign_demand_rate,gold_return,0.1615384022363719,535,42,18,
+all funds,foreign_demand_rate,usdvnd_return,0.19508272641331764,535,42,18,
+all funds,foreign_demand_rate,__best_model__,0.18366617623712866,535,42,18,(none)
+excluding mandate funds,foreign_demand_rate,us10y_pct,0.2788730300051474,484,42,16,
+excluding mandate funds,foreign_demand_rate,fed_funds_pct,0.29800170781011315,484,42,16,
+excluding mandate funds,foreign_demand_rate,vix,0.18567966865147734,484,42,16,
+excluding mandate funds,foreign_demand_rate,sp500_return,0.24435983725772173,484,42,16,
+excluding mandate funds,foreign_demand_rate,broad_dollar_return,0.17904980381235783,484,42,16,
+excluding mandate funds,foreign_demand_rate,gold_return,0.16708732864403258,484,42,16,
+excluding mandate funds,foreign_demand_rate,usdvnd_return,0.18979157817520959,484,42,16,
+excluding mandate funds,foreign_demand_rate,__best_model__,0.15625364064317757,484,42,16,(none)
+all funds,domestic_demand_rate,us10y_pct,0.18894585781593748,537,42,18,
+all funds,domestic_demand_rate,fed_funds_pct,0.1816584874007441,537,42,18,
+all funds,domestic_demand_rate,vix,0.35909913444231134,537,42,18,
+all funds,domestic_demand_rate,sp500_return,0.5913567805064466,537,42,18,
+all funds,domestic_demand_rate,broad_dollar_return,0.38090523804635434,537,42,18,
+all funds,domestic_demand_rate,gold_return,0.21072125914958184,537,42,18,
+all funds,domestic_demand_rate,usdvnd_return,0.2139406540976811,537,42,18,
+all funds,domestic_demand_rate,__best_model__,0.10932915440460445,537,42,18,(none)
+excluding mandate funds,domestic_demand_rate,us10y_pct,0.35253886271447205,486,42,16,
+excluding mandate funds,domestic_demand_rate,fed_funds_pct,0.25947093756634326,486,42,16,
+excluding mandate funds,domestic_demand_rate,vix,0.21003881353379988,486,42,16,
+excluding mandate funds,domestic_demand_rate,sp500_return,0.48485252157207454,486,42,16,
+excluding mandate funds,domestic_demand_rate,broad_dollar_return,0.14687543895230698,486,42,16,
+excluding mandate funds,domestic_demand_rate,gold_return,0.14428462692067157,486,42,16,
+excluding mandate funds,domestic_demand_rate,usdvnd_return,0.15282953609865493,486,42,16,
+excluding mandate funds,domestic_demand_rate,__best_model__,0.13720428418511807,486,42,16,sp500_return

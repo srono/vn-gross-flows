@@ -1,0 +1,14 @@
+fund_code,asset_class,manager_id,fund_name,n_months,subscription_rate_mean,redemption_rate_mean,redemption_rate_median,redemption_rate_p90,redemption_rate_geomean,redemption_rate_aum_wtd,implied_aum_attrition_pct,implied_aum_half_life_years,organic_growth_pct
+VCBF-TBF,balanced,vcbf,VCBF Tactical Balanced Fund,46,0.0364,0.0186,0.015,0.033,0.0187,0.0183,20.3141,3.0525,23.5769
+VINACAPITAL-VIBF,balanced,vinacapital,VinaCapital Integrated Balanced Fund,64,0.0776,0.052,0.0406,0.1037,0.0528,0.0476,47.8737,1.0639,35.3451
+VCBF-FIF,bond,vcbf,VCBF Fixed Income Fund,45,0.0759,0.0387,0.033,0.0799,0.039,0.0478,37.9921,1.4504,54.9899
+VINACAPITAL-VFF,bond,vinacapital,VinaCapital Enhanced Fixed Income Fund,62,0.0651,0.0673,0.0543,0.1225,0.0685,0.0633,57.3105,0.8143,-2.6054
+DCBF,bond,dcvfm,DC Bond Fund,57,0.0683,0.0755,0.0637,0.1621,0.0776,0.0859,62.0655,0.7151,-8.3437
+VLGF,equity,ssiam,Vietnam Long-term Growth Fund,34,0.027,0.0075,0.0012,0.0233,0.0076,0.0069,8.7813,7.5416,25.9953
+VCBF-BCF,equity,vcbf,VCBF Blue Chip Fund,46,0.0438,0.0216,0.0168,0.0402,0.0217,0.0226,23.1885,2.6274,30.0956
+VCBF-MGF,equity,vcbf,VCBF Midcap Growth Fund,46,0.0442,0.0273,0.025,0.0431,0.0275,0.0292,28.4432,2.0711,22.2096
+SSI-SCA,equity,ssiam,SSI Sustainable Competitive Advantage Fund,44,0.0351,0.0341,0.0251,0.0557,0.0348,0.0351,34.6512,1.6293,1.2858
+DCDE,equity,dcvfm,DC Dividend Focus Equity Fund,59,0.0539,0.0391,0.0305,0.0738,0.0396,0.0379,38.403,1.4305,19.2242
+DCDS,equity,dcvfm,DC Dynamic Securities Fund,59,0.0658,0.0416,0.0284,0.0904,0.0421,0.0459,40.3298,1.3424,33.1869
+VINACAPITAL-VESAF,equity,vinacapital,VinaCapital Strategic Growth Equity Fund,63,0.0627,0.0428,0.0353,0.0832,0.0433,0.0418,41.1739,1.3064,26.7407
+VINACAPITAL-VEOF,equity,vinacapital,VinaCapital Leading Enterprise Equity Fund,64,0.0666,0.0475,0.0378,0.0962,0.0483,0.0422,44.768,1.1676,25.5931

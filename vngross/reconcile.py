@@ -23,6 +23,7 @@ __all__ = [
     "Check",
     "reconcile",
     "check_net_flow_consistency",
+    "check_prior_column_consistency",
     "proxy_divergence",
     "chain_continuity",
     "summarise",
@@ -156,6 +157,51 @@ def check_net_flow_consistency(filing: Filing) -> Check:
             f"residual {residual:,.2f} VND"
         ),
         check="net_flow_consistency",
+    )
+
+
+def check_prior_column_consistency(filing: Filing) -> Check:
+    """Check that this period's closing values match prior period's opening values.
+
+    When a filing reports last period alongside this period, the prior nav_end should
+    match this period's nav_begin. Mismatches suggest restated priors or transcription
+    errors. Returns a warning (passed=True with detail) rather than a hard failure.
+    """
+    warnings = []
+
+    # Check nav_end(t-1) == nav_begin(t)
+    prior_nav_end = filing.prior_values.get("nav_end")
+    curr_nav_begin = filing.values.get("nav_begin")
+
+    if prior_nav_end is not None and curr_nav_begin is not None:
+        residual = curr_nav_begin - prior_nav_end
+        if not _within_tolerance(residual, prior_nav_end):
+            warnings.append(
+                f"prior nav_end {prior_nav_end:,.0f} vs current nav_begin "
+                f"{curr_nav_begin:,.0f}, gap {residual:,.0f} VND"
+            )
+
+    # Check nav_per_unit_end(t-1) == nav_per_unit_begin(t)
+    prior_pu_end = filing.prior_values.get("nav_per_unit_end")
+    curr_pu_begin = filing.values.get("nav_per_unit_begin")
+
+    if prior_pu_end is not None and curr_pu_begin is not None:
+        residual = curr_pu_begin - prior_pu_end
+        if not _within_tolerance(residual, prior_pu_end):
+            warnings.append(
+                f"prior nav_per_unit_end {prior_pu_end:,.2f} vs current "
+                f"nav_per_unit_begin {curr_pu_begin:,.2f}, gap {residual:,.2f}"
+            )
+
+    detail = "; ".join(warnings) if warnings else "prior columns consistent"
+
+    return Check(
+        fund_code=filing.fund_code,
+        period_end=filing.period_end,
+        passed=True,  # Warnings, not failures
+        residual_vnd=0.0,
+        detail=detail,
+        check="prior_column_consistency",
     )
 
 

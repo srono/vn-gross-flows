@@ -16,28 +16,29 @@ One row per fund per dealing period, built from Appendix XXIV of Circular
 98/2020/TT-BTC, the Ministry of Finance template every licensed Vietnamese
 open-ended fund must file on each dealing period.
 
-Current coverage, from the full run of 2026-08-16:
+Current coverage, from the full run of 2026-08-16 and its synchronized outputs:
 
 | | |
 |---|---|
 | Managers | 4: VinaCapital, DCVFM, VCBF, SSIAM |
-| Funds | 19 |
-| Rows | 3,860 fund-period observations |
-| Span | 2021-01-04 to 2026-08-13 |
-| Frequency | weekly; 95.7% of rows span exactly 6 days |
-| Quarantined | 23 |
-| Reconciliation residual | 0.00 VND on every row |
+| Funds | 18 economic funds (DCBC is DCDE's legacy identity) |
+| Rows | 3,989 fund-period observations; 950 fund-month observations |
+| Span | period ends from 2021-01-04 to 2026-08-13 |
+| Frequency | weekly; 95.8% of rows span exactly 6 days |
+| Quarantined | 20 |
+| Reconciliation residual | 3,988 exact zeros; one VND 480.93 residual inside a VND 784.63 scale-aware tolerance |
 
-| Manager | Funds | Rows |
+| Manager | Economic funds | Rows |
 |---|---|---|
-| VinaCapital | VEOF, VESAF, VFF, VIBF, VLBF | 1,387 |
-| DCVFM | DCDS, DCDE, DCBF, DCIP, DCBC | 1,070 |
+| VinaCapital | VEOF, VESAF, VFF, VIBF, VLBF | 1,381 |
+| DCVFM | DCDS, DCDE (including legacy DCBC), DCBF, DCIP | 1,069 |
 | VCBF | BCF, MGF, TBF, FIF, AIF | 921 |
-| SSIAM | SSI-SCA, SSIBF, SSI-EF, VLGF | 482 |
+| SSIAM | SSI-SCA, SSIBF, SSI-EF, VLGF | 618 |
 
-3,494 of the 3,860 rows carry the gross legs. The remainder come from managers
-filing a reduced template that discloses only the net line; `gross_legs_disclosed`
-marks them.
+3,490 of the 3,989 rows genuinely disclose both gross legs. The remainder come
+from reduced or incomplete templates; `gross_legs_disclosed` marks them, and
+`gross_legs_inferred_zero` separately marks nine net-only zero rows without
+promoting them to gross disclosure.
 
 The novel content is the **gross decomposition**.
 Subscriptions and redemptions are carried as separate disclosed cash flows, not
@@ -59,28 +60,23 @@ The panel never does this, and the reason is measured rather than asserted.
 
 Flows transact at intra-period dealing NAVs, so the proxy's error moves with the
 period return.
-Across all 920 diagnosable rows:
+Across 3,958 current-panel rows with nonzero disclosed net flow:
 
-| Statistic | Value |
-|---|---|
-| Median absolute error of the end-NAV proxy | 0.62% |
-| 90th percentile | 3.03% |
-| Maximum | 125% |
+| Statistic | End-NAV proxy | Midpoint-NAV proxy |
+|---|---:|---:|
+| Median absolute error, as % of disclosed net flow | 0.42% | 0.28% |
+| 90th percentile | 2.98% | 2.19% |
+| 99th percentile | 17.90% | 17.88% |
 
-On the reference filing (VCBBCF, week ending 2022-11-21) the proxy overstates
-the outflow by 3.19% in a week when NAV per unit rose 3.37%.
-The sign of that error is not random: it tracks the return.
+The midpoint proxy improves the absolute error in 2,972 of 3,973 comparable
+rows, but it does not eliminate it. On the reference filing (VCBBCF, week ending
+2022-11-21) the end-NAV proxy overstates the outflow by 3.19% in a week when NAV
+per unit rose 3.37%.
 
-That is the problem.
-An error in the dependent variable that correlates with the main regressor
-biases every flow-performance estimate, in a direction that manufactures the
-result such studies look for.
-A midpoint-NAV proxy reduces the error but does not remove it, and only helps in
-647 of 920 rows.
-
-`reconcile.proxy_divergence` computes both proxies on every row and writes them
-to `data/output/measurement_error_diagnostics.csv`.
-They exist as evidence for this section and must never be used as panel values.
+That is enough error to contaminate a flow-performance estimate, especially in
+the tails. `reconcile.proxy_divergence` computes both proxies on every row and
+writes them to `data/output/measurement_error_diagnostics.csv`. They are
+measurement diagnostics, not substitutes for lines 3.2.1 and 3.2.2.
 
 ### 2.2 Flows are scaled by beginning-of-period NAV
 
@@ -114,12 +110,11 @@ It is an internal consistency condition on six independently printed numbers,
 so a parse that misreads a column, drops a sign, or slips a digit cannot satisfy
 it by accident.
 
-All 3,860 rows in the panel close this identity to **0.00 VND**, across four
-managers, three container formats, two template variants and five years.
-Not "within tolerance" - the residual is exactly zero at float precision on
-every row.
-The tolerance in `reconcile.ABS_TOL_VND` exists only to absorb float
-representation of 1e14-magnitude values and has never been needed.
+Of the 3,989 accepted rows, 3,988 close the identity to 0.00 VND. SSI-SCA's
+period ending 2025-01-15 has a VND 480.93 floating-point residual against VND
+784.6bn closing NAV, below the scale-aware tolerance of VND 784.63. The gate is
+therefore exact where arithmetic permits and explicit about its numerical
+tolerance where it does not.
 
 A blank cell is absent, not zero.
 `chg_distribution` is blank whenever no distribution was paid, and the parser
@@ -127,18 +122,16 @@ records absence rather than fabricating a `0.0`.
 Zero is substituted only inside the identity arithmetic, and the check's detail
 string names every line it treated that way.
 
-A failing row is quarantined with a written reason, never dropped. 23 rows are
-currently quarantined: three DCVFM filings whose printed period dates are
-impossible (36 days, 371 days, and one running backwards by 116 days), seven
-VinaCapital rows, and thirteen SSIBF rows carrying small unreconciled residuals
-between 0.003% and 0.17% of NAV that have not yet been diagnosed individually. The parser records what the
-document says rather than guessing a plausible date, and the period-length gate
-catches the result.
+A failing row is quarantined with a written reason, never dropped. The current
+20 rows comprise 16 strict period overlaps, one implausible negative period,
+one missing period end, one failed NAV identity, and one missing opening NAV.
+Shared closing/opening boundary dates are supported and are not overlaps.
 
-The same rule applies to filings that cannot be parsed at all. 1,620 are listed
-in `data/output/parse_failures.csv`. Discarding that list once hid an entire
-fund, VinaCapital's VLBF and its 255 filings, behind a panel that looked
-complete; the panel stage now writes it and logs a per-fund breakdown.
+The same rule applies to filings that cannot be parsed at all. The current
+`data/output/parse_failures.csv` retains 1,497 failures with source and reason.
+Discarding that list once hid an entire fund, VinaCapital's VLBF, behind a panel
+that looked complete; the panel stage now writes it and logs a per-fund
+breakdown.
 
 ### 3.1 Independent validation
 
@@ -230,7 +223,7 @@ D10 From 28 Dec 2023 to 03 Dec 2024                                (mistyped)
 
 Trusting English dates that row eleven months late, which misaligns its return
 window and inverts its position in the chain.
-Eight filings carry such disagreements.
+Thirteen accepted filings carry such bilingual disagreements.
 
 Vietnamese is now authoritative, English is the fallback, and any disagreement is
 recorded in the `date_conflict` column rather than resolved silently.
@@ -349,46 +342,36 @@ second copy exists later in the same document, and preferring whichever copy
 satisfies the identity would recover them, but that is a large amount of
 machinery to justify on three rows out of 4,543.
 
+The six-line NAV identity is necessary but not sufficient. The build also
+checks same-filing prior columns, contiguous cross-filing NAV and NAV-per-unit
+chains, strict period overlap, foreign value against foreign units times closing
+NAV per unit, and disclosed ownership against independently implied shares.
+Malformed optional prior columns are retained as warnings; extreme contiguous
+scale reversals and overlaps are quarantined with observed ratios and sources.
+
 ## 5. Archive gaps
 
-Chain continuity verifies that each fund's opening NAV equals the prior filing's
-closing NAV.
-A break means a filing is missing, which matters because an unnoticed gap turns
-an unobserved period into a fabricated flow: the next filing's opening NAV
-silently absorbs it.
+Chain continuity verifies that each fund's opening NAV equals the preceding
+accepted filing's closing NAV. A break can mean an unpublished filing, a parse
+failure, a quarantined row, a source restatement, or another unresolved chain
+discontinuity. It matters because an unnoticed gap can make a multi-period
+window jump over unobserved flow.
 
-19 breaks remain, and every one is explained:
+The current combined build writes 79 records across all 18 economic funds to
+`data/output/continuity_breaks.csv`, each with observed values and a written
+detail. They are reported rather than automatically quarantined because the
+rows on either side can each pass their own accounting and independent gates.
+Exact-consecutive growth analyses reject windows that cross missing calendar
+months rather than treating them as continuous.
 
-| Cause | Count |
-|---|---|
-| Weeks VCBF never published | 17 |
-| Weeks published as truncated files | 2 |
-| Unexplained | 0 |
-
-Verified by checking, for each break, whether the missing week exists anywhere in
-the enumerated listing.
-No break is attributable to the crawler.
-
-Two patterns are worth noting.
-The week of 2025-05-29 to 2025-06-04 and the week of 2023-10-12 to 2023-10-18 are
-missing for all five funds, which points to a manager-wide publishing lapse
-rather than per-fund omissions.
-
-The two truncated files are VCBF-BCF and VCBF-AIF for the week ending
-2025-11-26, served at 4,096 and 12,288 bytes with matching `Content-Length` while
-sibling funds' files for the same week are 40 to 47 KB.
-The zip central directory is absent, so the workbooks cannot be opened.
-This is not a transfer error and refetching does not fix it.
-
-Two further listing entries advertise a filing but link to
-`javascript:void(0);`, so no file was ever published.
-These are recorded in `data/interim/dead_vcbf.csv` and in `sources.yaml` rather
-than dropped, because an undocumented hole is indistinguishable from data.
-
-Breaks are reported in `data/output/continuity_breaks.csv`.
-They are **not** quarantined: the rows either side of a gap are individually
-valid and reconcile exactly.
-Anyone computing a multi-period quantity must consult that file.
+The earlier VCBF-only source audit found 19 breaks: 17 weeks absent from VCBF's
+listing and two truncated workbooks. That historical adjudication remains useful
+for the VCBF subset but must not be mistaken for the combined-panel count.
+Two manager-wide examples are the weeks of 2025-05-29 to 2025-06-04 and
+2023-10-12 to 2023-10-18. The truncated VCBF-BCF and VCBF-AIF workbooks for the
+week ending 2025-11-26 are served at 4,096 and 12,288 bytes with no zip central
+directory, so refetching does not repair them. Two further VCBF listing entries
+link only to `javascript:void(0);`; they remain in `data/interim/dead_vcbf.csv`.
 
 ### 5.1 Duplicate republications
 
@@ -462,20 +445,19 @@ The resulting series covers 2022-07 to 2026-08 as:
 | Bridged between agreeing observations | 10 | - |
 | Left missing | 4 | 2025-11 to 2026-02 |
 
-838 of 921 panel rows (91%) receive a rate.
-`deposit_rate_source` and `deposit_rate_bank` are on every panel row, so a
-single-bank month is never mistaken for a four-bank one.
+3,031 of 3,989 period rows (76.0%) receive a non-missing rate.
+`deposit_rate_source` and `deposit_rate_bank` are carried with every joined
+value, so a single-bank month is never mistaken for a four-bank one.
 
 Three caveats follow, and none of them are minor.
 
-**Most of it is one bank, not four.**
-21 of the 23 observed months are Agribank alone.
-Agribank is a state-owned commercial bank and one of the big four, so its board
-rate is a reasonable reference rather than an outlier, but a single-bank board
-rate is not a market average.
-Only the two CafeF months are true four-bank means.
-The `deposit_rate_bank` and `deposit_rate_source` columns say which is which on
-every row.
+**Most directly observed months are not four-bank means.**
+Twenty-one of the 36 directly observed months are Agribank alone. Agribank is a
+state-owned commercial bank and one of the big four, so its board rate is a
+useful reference rather than an outlier, but a single-bank board rate is not a
+market average. Six observations are VNDIRECT market averages, four are Shinhan
+state-owned-bank averages, three come from verified press reports, and only the
+two CafeF months are true four-bank means.
 
 **There is no carry-forward at all. A month is filled only if it is bracketed.**
 An earlier version of this series carried the last observation forward for up to
@@ -493,19 +475,12 @@ That is interpolation between two measured points at one value.
 A one-sided carry is an extrapolation into a period the series has no information
 about, and it is exactly where the errors were.
 
-The cost is real: coverage falls from 82% to 62% of panel rows.
-That is the right trade. A missing value is a fact about the series; a wrong value
-is a defect that propagates into every regression that uses it.
-
-Concretely, this leaves every transitional period missing:
-2023-05, 2023-07 to 2023-11, 2024-01 to 2024-04, and 2025-08 to 2026-02 are all
-stretches whose bracketing observations disagree, so the rate moved somewhere
-inside them and the series declines to guess where.
-Each such row's `provenance` names both bracketing observations and their levels.
-
-The eight bridged months are 2023-01, 2024-07, 2024-08, 2025-01 and 2026-04 to
-2026-07, every one of them sitting between two observations at an identical
-level.
+The cost is explicit: four months—2025-11 through 2026-02—remain missing
+because the observations bracketing the gap disagree. Ten months are bridged
+only between matching observations: 2023-01; 2024-07 and 2024-08; 2025-01,
+2025-08 and 2025-09; and 2026-04 through 2026-07. Observed-only econometric
+specifications exclude every bridged month, and a deposit-rate change is marked
+observed only when both adjacent levels are directly observed.
 
 ### 6.4 External corroboration
 
@@ -625,19 +600,80 @@ reliably retrievable.
 It remains the best available cross-check on the level, which is how it is used
 in the carry-forward decision above.
 
+### 6.5 Growth-research estimands
+
+The manager-facing growth analysis is built from the current panel by
+`scripts/build_growth_research.py`; derived tables and their hashes are in
+`data/output/growth_research/`.
+
+The primary acquisition specification uses equity and balanced funds with truly
+disclosed gross legs, excludes DCIP and each fund's first twelve months of life,
+compounds exact-consecutive 1/3/6/12-month total returns, ranks performance
+within month and asset class, includes explicit fund and month fixed effects,
+and clusters standard errors by month.
+
+Launch months are excluded on sourced inception dates from
+`data/fund_reference.csv`, not on position in the archive.
+The distinction matters because most funds here were years old when their
+coverage begins: DCDS was 204 months old at its first filed row, so counting
+from that row discarded ordinary months, and only three funds launch inside the
+window at all.
+Where an inception date is unavailable the filter falls back to archive
+position, so a missing date degrades the sample rather than the code.
+
+The twelve-month window is chosen from the flat part of a sensitivity curve.
+Percentage flow rates are not meaningful while the NAV denominator is small and
+growing fast: VLGF's fifth month shows a 1,316% subscription rate because one
+mandate took it from VND164bn to VND2,065bn, and that single row moves the
+3-month subscription coefficient from +1.98 to -1.86.
+Excluding 6, 9, 12, 18 or 24 months all give a 3-month coefficient near +2.0pp
+and a 6-month coefficient between +2.89 and +3.31pp, so the estimates are
+insensitive to the threshold anywhere above the launch distortion itself.
+
+The monthly rollup assigns each filing's whole flow to its ending month. In the
+current panel 804 period rows cross a calendar-month boundary, so seasonality and
+monthly timing should be read with that limitation. Exact-consecutive windows do
+not bridge a missing month, and dirty monthly accounting rows are rejected using
+the same scale-aware NAV tolerance as the period gate.
+
+Foreign and domestic **net unit demand** are inferred only for validated stock
+chains:
+
+```
+foreign net units  = foreign_units(t) - opening foreign units
+domestic net units = total unit change - foreign net units
+segment demand VND = segment net units × midpoint NAV per certificate
+```
+
+This is not a decomposition of gross subscriptions or gross redemptions. It does
+not identify investor counts, customers, retail/institutional status, motives,
+or transfers between funds. Every pair must satisfy stock non-negativity,
+foreign units not exceeding total units, the foreign-value identity, prior-stock
+agreement, filing contiguity, and total unit-change value within 1% of opening
+NAV of disclosed net flow. The build validates 3,871 periods and rejects 118
+with categorized reasons.
+
+Macro sensitivity is exploratory. Deposit-rate rows use directly observed
+levels only, lag-one specifications use information available before the demand
+month, and aggregate monthly regressions use Newey-West/HAC standard errors.
+Short, source-mixed rate history and incomplete bond benchmarks preclude causal
+language or production triggers without a randomized CRM test.
+
 ---
 
 ## 7. Limitations
 
 These are stated first because a reviewer will find them anyway.
 
-**`gross_return` is not distribution adjusted.**
-It is `nav_per_unit_end / nav_per_unit_begin - 1`.
-Any fund paying distributions on line 3.3 needs a total-return series built
-before a performance-chasing test.
-Most Vietnamese equity open-ended funds accumulate rather than distribute, and
-line 3.3 is blank throughout the current sample, but this must be verified per
-fund rather than assumed as coverage extends.
+`price_return` is the NAV-per-certificate price change. `distribution_yield`
+converts signed line 3.3 to positive cash per beginning certificate, and
+`total_return = price_return + distribution_yield`. Analytical performance uses
+`total_return`; `gross_return` remains the unadjusted legacy price-return field.
+
+For contiguous accepted filings, market-return measurement chains the current
+`index_begin` to the preceding accepted row's `index_end`. First rows and rows
+after gaps use the last close at or before `period_start` and carry a
+`market_boundary_source` flag.
 
 **Unit series break on corporate actions.**
 Splits, consolidations and distributions paid in units break any series derived
@@ -646,16 +682,16 @@ Flows from 3.2.1 and 3.2.2 are immune, which is a further argument for reading
 flows rather than inferring them, but NAV-per-unit return series need adjustment.
 
 **Survivorship is unaddressed.**
-The sample is VCBF's five currently operating funds.
-Closure correlates with poor performance and outflows, so an as-is sample biases
-any flow-performance estimate.
-Recovering closed and merged funds needs the Vietstock mirror, which is not yet
-usable: its document lists load from a tokenised AJAX endpoint rather than static
-links, and recovering it needs a browser-driven session.
-The DCVFM funds are the main exposure, given the VFM to Dragon Capital
-transition.
+The combined sample contains 18 currently operating economic funds across four
+managers. Closed and genuinely discontinued funds are not represented, and
+closure plausibly correlates with poor performance and outflows. Recovering them
+requires older Circular 183/2011 templates and, for some pre-2013 filings, image
+OCR. This limitation is more important than current-manager coverage.
 
-**Four managers, nineteen funds, none of them closed.**
+**Four managers, eighteen economic funds.**
+DCBC and DCDE are one continuous economic fund: the rename boundary chains
+exactly in total NAV, NAV per certificate, and foreign units. The source filename
+identity remains available in `source_fund_key`.
 All four are `verified`; see section 8. Coverage is no longer the constraint.
 Survivorship is: every fund in the panel is still operating, and closure
 correlates with the outflows this dataset exists to measure.
@@ -663,7 +699,7 @@ correlates with the outflows this dataset exists to measure.
 **Filing frequency varies.**
 Most funds file weekly; some file daily.
 `period_days` is on every row and must be checked before pooling.
-95.7% of the panel is six-day periods; the remainder run from one to thirteen
+95.8% of the panel is six-day periods; the remainder run from zero to thirteen
 days. DCBF in particular files on a genuinely variable dealing calendar.
 
 **No pre-2021 template detector.**
@@ -683,12 +719,12 @@ the listing rather than constructed.
 Spec section 10 step 7, worked 2026-08-15 and 2026-08-16, one manager at a time,
 each with its own fixture.
 
-| Manager | Status | Funds | In panel | Span |
-|---|---|---|---|---|
-| VinaCapital | verified | 5 | 1,387 | 2021-01 to 2026-08 |
-| DCVFM | verified | 5 | 1,070 | 2021-06 to 2026-08 |
+| Manager | Status | Economic funds | In panel | Span |
+|---|---|---:|---:|---|
+| VinaCapital | verified | 5 | 1,381 | 2021-01 to 2026-08 |
+| DCVFM | verified | 4 | 1,069 | 2021-06 to 2026-08 |
 | VCBF | verified | 5 | 921 | 2022-07 to 2026-08 |
-| SSIAM | verified | 4 | 439 | 2021-07 to 2026-07 |
+| SSIAM | verified | 4 | 618 | 2021-05 to 2026-08 |
 
 The central claim of the build survived: **the Ministry of Finance template is
 genuinely identical across managers.** A VinaCapital weekly filing parsed to a
@@ -787,8 +823,9 @@ changing a filter fires no interceptable request. All of that remains true.
 It was the wrong place to look. The pre-Salesforce WordPress estate is still
 served at `maintenance.dragoncapital.com.vn`, with a sitemap, 50 child report
 sitemaps and 27,712 report pages, each linking one file on an Azure CDN. 1,077
-weekly change reports across five funds were enumerated from it, and 1,070
-reached the panel at a zero-dong residual.
+weekly change reports across five source keys were enumerated from it; after
+canonicalizing DCBC into DCDE and applying current gates, 1,069 rows reach the
+panel.
 
 The generalisable lesson: a single-page application is a rendering choice, not
 a statement about what the manager publishes. Before concluding an archive is
@@ -866,8 +903,14 @@ because these are small managers' servers hosting mandatory disclosures.
 The full VCBF fetch is 933 requests, about 16 minutes, and completed with zero
 failures on 2026-08-15.
 
-Deposit rate regeneration is separate and deliberately manual:
+Deposit rate and growth-research regeneration are separate and deliberately
+explicit:
 
 ```bash
 python scripts/build_deposit_rate.py
+python scripts/build_growth_research.py  # offline after the macro cache exists
 ```
+
+The growth manifest pins both panel hashes and every published derived CSV. Use
+`--fetch-macro` only to refresh the ignored local FRED cache; raw third-party
+macro observations are not copied into the publication folder.

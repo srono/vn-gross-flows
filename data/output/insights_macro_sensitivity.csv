@@ -1,0 +1,11 @@
+controls,coef,std_err,t,n_obs,n_clusters,within_r2,group
+none,-0.020832,0.002641,-7.88686,423,46,0.248671,equity_balanced
+ret_lag1_6,-0.016868,0.00321,-5.254024,401,46,0.267317,equity_balanced
+"ret_lag1_6, market_return",-0.01683,0.003187,-5.280632,401,46,0.267423,equity_balanced
+"ret_lag1_6, market_return, time_trend",-0.012243,0.003702,-3.307175,401,46,0.295073,equity_balanced
+"ret_lag1_6, market_return, time_trend, log_nav_begin",-0.012216,0.003742,-3.264043,401,46,0.29656,equity_balanced
+none,-0.035997,0.006007,-5.991979,141,46,0.198433,bond
+ret_lag1_6,-0.035883,0.006489,-5.529777,131,46,0.202018,bond
+"ret_lag1_6, market_return",-0.035222,0.006451,-5.459554,131,46,0.205986,bond
+"ret_lag1_6, market_return, time_trend",-0.042824,0.008016,-5.342418,131,46,0.242224,bond
+"ret_lag1_6, market_return, time_trend, log_nav_begin",-0.046858,0.010507,-4.459839,131,46,0.252328,bond

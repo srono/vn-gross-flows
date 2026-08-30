@@ -5,6 +5,7 @@ Usage:
     python -m vngross.run fetch    [manager ...]
     python -m vngross.run parse    [manager ...]
     python -m vngross.run panel    [manager ...]
+    python -m vngross.run insights
 
 Each stage writes to data/interim or data/output and is safe to re-run: fetch
 skips cached URLs and parse reads only from disk.
@@ -104,6 +105,16 @@ def load_filings(manager_id: str) -> tuple[list[Filing], list[dict]]:
             continue
         path = ROOT / ref["path"]
         fund_code = (funds.get(ref["fund_key"]) or {}).get("code") or ref["fund_code"]
+        # Cached references may predate the VinaCapital filename-identity guard.
+        # Revalidate locally so a rebuild cannot preserve a known page-filter
+        # contamination merely because discovery was intentionally skipped.
+        if manager_id == "vinacapital":
+            from .discover import _vc_fund_key_from_url
+
+            filename_key = _vc_fund_key_from_url(ref["url"], funds)
+            if filename_key is not None:
+                ref["fund_key"] = filename_key
+                fund_code = (funds.get(filename_key) or {}).get("code", fund_code)
         try:
             filing = parse_filing(path, fund_code=fund_code)
         except Exception as exc:  # noqa: BLE001 - one bad filing must not abort
@@ -114,6 +125,7 @@ def load_filings(manager_id: str) -> tuple[list[Filing], list[dict]]:
             failures.append({**ref, "error": f"{type(exc).__name__}: {detail}"})
             continue
         filing.source = ref["url"]
+        filing.source_fund_key = ref.get("fund_key")
         filings.append(filing)
     return filings, failures
 
@@ -124,7 +136,7 @@ def stage_parse(managers: list[str]) -> None:
 
     for manager_id in managers:
         filings, failures = load_filings(manager_id)
-        filings, superseded = deduplicate(filings)
+        filings, superseded, _overlaps, _corrections = deduplicate(filings)
         log.info(
             "%s: parsed %d unique, %d superseded duplicates, %d failed",
             manager_id, len(filings), len(superseded), len(failures),
@@ -159,12 +171,16 @@ def stage_panel(managers: list[str]) -> None:
         cfg = manager_config(manager_id)
         for key, meta in (cfg.get("funds") or {}).items():
             code = (meta or {}).get("code", key.upper())
-            fund_meta[code] = {
+            record = {
                 "manager_id": manager_id,
                 "fund_key": key,
                 "fund_name": (meta or {}).get("name"),
                 "asset_class": (meta or {}).get("asset_class"),
             }
+            # A legacy filename entry must never overwrite the canonical fund's
+            # descriptive metadata merely because both map to the same code.
+            if not (meta or {}).get("legacy_alias_of") or code not in fund_meta:
+                fund_meta[code] = record
 
     if all_failures:
         pd.DataFrame(all_failures).to_csv(OUTPUT / "parse_failures.csv", index=False)
@@ -184,6 +200,7 @@ def stage_panel(managers: list[str]) -> None:
     result.superseded.to_csv(OUTPUT / "superseded_duplicates.csv", index=False)
     result.continuity_breaks.to_csv(OUTPUT / "continuity_breaks.csv", index=False)
     result.diagnostics.to_csv(OUTPUT / "measurement_error_diagnostics.csv", index=False)
+    result.period_corrections.to_csv(OUTPUT / "period_corrections.csv", index=False)
     to_monthly(panel).to_csv(OUTPUT / "vngross_fund_month.csv", index=False)
 
     # Independent validation: Fmarket publishes NAV per certificate from its own
@@ -228,7 +245,7 @@ def stage_analysis(managers: list[str]) -> None:
 
     for label, frame, time_col, windows in (
         ("weekly", period, "period_end", (1, 4, 12)),
-        ("monthly", monthly, "period_end", (1, 3, 6)),
+        ("monthly", monthly, "period_end", (1, 3, 6, 12)),
     ):
         frame, filters = prepare_sample(frame, time_col=time_col)
         print(f"\nsample filters: {filters}")
@@ -268,11 +285,112 @@ def stage_analysis(managers: list[str]) -> None:
                       else f"    {key:<32} {value}")
 
 
+def stage_insights(managers: list[str]) -> None:
+    """Derive the manager-facing readings from the monthly panel.
+
+    Runs on the monthly rollup rather than the weekly panel because every
+    question here is asked at a planning cadence, and because a weekly
+    redemption rate is dominated by which day of the week a dealing period
+    happened to close.
+    """
+    from .analysis import add_lagged_performance, prepare_sample
+    from .insights import (
+        flow_regime,
+        forecast_backtest,
+        leg_response,
+        macro_sensitivity,
+        retention_table,
+        seasonality_table,
+        turnover_outliers,
+    )
+
+    monthly = pd.read_csv(OUTPUT / "vngross_fund_month.csv")
+    sample, filters = prepare_sample(monthly, time_col="period_end")
+    sample = add_lagged_performance(sample, windows=(1, 3, 6, 12), time_col="period_end")
+    print(f"\nsample filters: {filters}")
+
+    excluded = turnover_outliers(sample)
+    if excluded:
+        print(f"high-turnover vehicles excluded from estimates: {', '.join(excluded)}")
+
+    # The two groups answer to different products. Equity and balanced funds
+    # compete with holding shares directly; bond funds compete with a term
+    # deposit. Pooling them averages two different demand curves.
+    groups = {
+        "equity_balanced": sample[sample["asset_class"].isin(["equity", "balanced"])],
+        "bond": sample[sample["asset_class"] == "bond"],
+    }
+
+    legs = []
+    for label, frame in groups.items():
+        table = leg_response(frame)
+        if not table.empty:
+            legs.append(table.assign(group=label).reset_index(names="bin"))
+            print(f"\n{'=' * 72}\nflow rate by past-performance bin: {label}\n{'=' * 72}")
+            print(table.to_string())
+    if legs:
+        pd.concat(legs, ignore_index=True).to_csv(
+            OUTPUT / "insights_leg_response.csv", index=False
+        )
+
+    retention = retention_table(sample)
+    if not retention.empty:
+        retention.to_csv(OUTPUT / "insights_retention.csv")
+        print(f"\n{'=' * 72}\nannualised attrition and holding half-life\n{'=' * 72}")
+        print(retention.to_string())
+
+    seasons = []
+    for label, frame in groups.items():
+        table = seasonality_table(frame)
+        if not table.empty:
+            seasons.append(table.assign(group=label).reset_index())
+            print(f"\n{'=' * 72}\nflow rate by calendar month, demeaned within fund: "
+                  f"{label}\n{'=' * 72}")
+            print(table.to_string())
+    if seasons:
+        pd.concat(seasons, ignore_index=True).to_csv(
+            OUTPUT / "insights_seasonality.csv", index=False
+        )
+
+    macro = []
+    for label, frame in groups.items():
+        table = macro_sensitivity(frame)
+        if not table.empty:
+            macro.append(table.assign(group=label))
+            print(f"\n{'=' * 72}\ndeposit-rate sensitivity of subscriptions: {label}"
+                  f"\n{'=' * 72}")
+            print(table.to_string(index=False))
+    if macro:
+        pd.concat(macro, ignore_index=True).to_csv(
+            OUTPUT / "insights_macro_sensitivity.csv", index=False
+        )
+
+    backtests = []
+    for label, frame in groups.items():
+        table = forecast_backtest(frame)
+        if not table.empty:
+            backtests.append(table.assign(group=label))
+    if backtests:
+        table = pd.concat(backtests, ignore_index=True)
+        table.to_csv(OUTPUT / "insights_forecast_backtest.csv", index=False)
+        print(f"\n{'=' * 72}\nout-of-sample forecast: does market data beat flow momentum?"
+              f"\n{'=' * 72}")
+        print(table.to_string(index=False))
+
+    # Unfiltered and unwinsorised on purpose: this one reports rather than
+    # estimates, so it reads the panel as published.
+    regime = flow_regime(monthly)
+    if not regime.empty:
+        regime.to_csv(OUTPUT / "insights_flow_regime.csv")
+        print(f"\n{'=' * 72}\nnet flow over the last 10 months\n{'=' * 72}")
+        print(regime.to_string())
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="vngross.run")
     parser.add_argument(
         "stage",
-        choices=["discover", "fetch", "parse", "panel", "analysis", "all"],
+        choices=["discover", "fetch", "parse", "panel", "analysis", "insights", "all"],
     )
     parser.add_argument("managers", nargs="*")
     parser.add_argument("-v", "--verbose", action="store_true")
@@ -293,12 +411,22 @@ def main(argv: list[str] | None = None) -> int:
         "parse": stage_parse,
         "panel": stage_panel,
         "analysis": stage_analysis,
+        "insights": stage_insights,
     }
-    for name in (["discover", "fetch", "parse", "panel", "analysis"]
+    for name in (["discover", "fetch", "parse", "panel", "analysis", "insights"]
         if args.stage == "all"
         else [args.stage]):
         log.info("=== stage %s: %s ===", name, ", ".join(managers))
         stages[name](managers)
+    if args.stage in {"all", "insights"}:
+        from .manifest import write_build_manifest
+
+        manifest = write_build_manifest(OUTPUT, managers, ROOT)
+        if manifest["economic_fund_count"] != 18:
+            raise RuntimeError(
+                f"expected 18 economic funds, got {manifest['economic_fund_count']}"
+            )
+        log.info("wrote build manifest for %d economic funds", manifest["economic_fund_count"])
     return 0
 
 

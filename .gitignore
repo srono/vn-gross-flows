@@ -8,6 +8,11 @@ data/raw/
 # Run logs.
 data/interim/*.log
 
+# Global macro observations fetched from FRED for the optional growth-research
+# build. Some upstream series are copyrighted, so cache locally and publish
+# only derived estimates plus source metadata.
+data/interim/global_macro/
+
 .venv/
 __pycache__/
 *.py[cod]
@@ -22,3 +27,34 @@ __pycache__/
 # Third-party onboarding text, unrelated to this project.
 AGENTS.md
 vnai/
+
+# FiinGroup monthly fund reports. A commercial vendor's copyrighted
+# publications, cached for cross-checking and never redistributed. The index
+# in data/fiin_report_index.csv records what was fetched and from where.
+data/interim/fiin_reports/
+
+# Working notes, drafts and commercial material. Kept locally, not published:
+# implementation handoffs, exploratory scouting superseded by the research
+# brief, client-facing activation work, and article drafts.
+linkedin_*.md
+linkedin_article.md
+TASK_*.md
+docs-build-spec-*.md
+SCOUT_FINDINGS.md
+SALESFORCE_ACTIVATION_BLUEPRINT.md
+
+# Research writeups and interpretation. The panel is the public product; what
+# it is taken to mean is not published here.
+RESEARCHS.md
+OPEN_QUESTIONS.md
+GROWTH_RESEARCH_BRIEF.md
+sample_report/
+data/open_questions/
+
+# Manager-specific research outputs. Produced by scripts/build_growth_research.py
+# and scripts/test_fee_retention.py, and listed in the growth_research manifest
+# so a rebuild still reconciles, but not published: they are a named-manager
+# scorecard rather than a description of the market.
+data/output/growth_research/vinacapital_performance_case_study.csv
+data/output/growth_research/book_flow_conversion_by_manager_asset.csv
+data/output/growth_research/fee_vs_retention_manager_spread.csv
